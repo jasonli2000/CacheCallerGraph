@@ -16,8 +16,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #----------------------------------------------------------------
-import set
-import dict
+
+import glob
+import re
+import os.path
 
 class Routine:
     #constructor
@@ -60,7 +62,7 @@ class Package:
     #constructor
     def __init__(self, packageName):
         self.name=packageName
-        self.routines=dick()
+        self.routines=dict()
     def addToPackage(self,Routine):
         self.routines[Routine.getName()] = Routine
         Routine.setPackage(self)
@@ -70,3 +72,46 @@ class Package:
         return self.routines[routineName]
     def hasRoutine(self, routineName):
         return routineName is self.routines.keys
+
+class CallerGraphLogFileParser:
+    def onNewRoutineStart(self, routineName):
+        pass
+    def onNewRoutineEnd(self, routineName):
+        pass
+    def onLocalVariablesStart(self,localVariables):
+        pass
+    def onGlobaleVariables(self,globalVariables):
+        pass
+    def onCalledRoutines(self,routines):
+        pass
+    def onNakedGlobals(self, nakedGlobals):
+        pass
+    def onMarkedItems(self, markedItems):
+        pass
+#Routines starts with A followed by a number
+ARoutineEx=re.compile("^A[0-9]+$") 
+if __name__ == '__main__':
+    routineFilePattern = "*/Routines/*.m"
+    routineFileDir = "C:/cygwin/home/jason.li/git/VistA-FOIA/Packages/"
+    searchFiles = glob.glob(os.path.join(routineFileDir, routineFilePattern))
+    print "Total Search Files are %d " % len(searchFiles)
+    AllRoutines=dict()
+    AllPackages=dict()
+    for file in searchFiles:
+        routineName = os.path.basename(file).split(".")[0]
+        packageName = os.path.dirname(file)
+        packageName = packageName[packageName.index("Packages")+9:packageName.index("Routines")-1]
+        if packageName not in AllPackages.keys():
+            AllPackages[packageName]= Package(packageName)
+        if routineName not in AllRoutines:
+            AllRoutines[routineName]=Routine(routineName,AllPackages[packageName])
+        else:
+            print ("Duplicated Routine name")
+        if ARoutineEx.search(routineName):
+            print "A Routines %s should be exempted" % routineName
+
+    print "Total package is %d and Total Routines are %d" % (len(AllPackages), len(AllRoutines))
+    
+    
+    # the step to parse the log file
+    callerGraphLogFile = "C:/Users/jason.li/"
