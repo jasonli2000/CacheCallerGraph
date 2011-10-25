@@ -19,7 +19,10 @@
 
 import glob
 import re
+import os
 import os.path
+
+nameValuePair=re.compile("^ +(?P<name>[^ ]+) +(?P<value>[^ ]+)$")
 
 class Routine:
     #constructor
@@ -57,6 +60,10 @@ class Routine:
         return self.calledRoutines
     def setPackage(self, package):
         self.package = package
+    def printResult(self):
+        print "Routine Name: %s" % (self.name)
+        for var in self.localVariables:
+            print "Local Vars: %s " % var
         
 class Package:
     #constructor
@@ -72,24 +79,120 @@ class Package:
         return self.routines[routineName]
     def hasRoutine(self, routineName):
         return routineName is self.routines.keys
+    def getName(self):
+        return self.name
+
+class AbstractSectionParse:       
+    def parseLine(self, line):
+        pass
+    def setRoutine(self, routine):
+        pass
+
+class LocalVarSectionParse (AbstractSectionParse):
+    def __init__(self):
+        self.routine=None
+    def parseLine(self, line):
+        result = nameValuePair.search(line)
+        if (result):
+                self.routine.addLocalVariables(result.group('name'))
+    def setRoutine(self, routine):
+        self.routine=routine
+
+class GlobalVarSectionParse (AbstractSectionParse):
+    def __init__(self):
+        self.routine=None
+    def parseLine(self, line):
+        result = nameValuePair.search(line)
+        if (result):
+                self.routine.addGlobalVariables(result.group('name'))
+    def setRoutine(self, routine):
+        self.routine=routine
+
+class NakedGlobalsSectionParser (AbstractSectionParse):
+    def __init__(self):
+        self.routine=None
+    def parseLine(self, line):
+        result = nameValuePair.search(line)
+        if (result):
+                self.routine.addNakedGlobals(result.group('name'))
+    def setRoutine(self, routine):
+        self.routine=routine    
+
+class MarkedItemsSectionParser (AbstractSectionParse):
+    def __init__(self):
+        self.routine=None
+    def parseLine(self, line):
+        result = nameValuePair.search(line)
+        if (result):
+                self.routine.addMarkedItem(result.group('name'))
+    def setRoutine(self, routine):
+        self.routine=routine
+                        
+class CalledRoutineSectionParser (AbstractSectionParse):
+    def __init__(self):
+        self.routine=None
+    def parseLine(self, line):
+        result = nameValuePair.search(line)
+        if (result):
+                self.routine.addCalledRoutines(result.group('name'))
+    def setRoutine(self, routine):
+        self.routine=routine    
+# global one 
+localVarParser=LocalVarSectionParse()
+globalVarParser=GlobalVarSectionParse()
+nakedGlobalParser=NakedGlobalsSectionParser()
+markedItemsParser=MarkedItemsSectionParser()
+calledRoutineParser=CalledRoutineSectionParser()
+
 
 class CallerGraphLogFileParser:
+    def __init__(self):
+        self.allRoutines = dict()
+        self.currentRoutine=None
+        self.parser=None
+        
     def onNewRoutineStart(self, routineName):
-        pass
+        if not self.currentRoutine:
+            self.currentRoutine = Routine(routineName)
+        if (routineName != self.currentRoutine):
+            self.currentRoutine = Routine(routineName)
+        
     def onNewRoutineEnd(self, routineName):
-        pass
-    def onLocalVariablesStart(self,localVariables):
-        pass
-    def onGlobaleVariables(self,globalVariables):
-        pass
-    def onCalledRoutines(self,routines):
-        pass
-    def onNakedGlobals(self, nakedGlobals):
-        pass
-    def onMarkedItems(self, markedItems):
-        pass
+        self.allRoutines[routineName] = self.currentRoutine
+        self.currentRoutine = None
+        
+    def onLocalVariablesStart(self, line):
+        self.parser=localVarParser
+        self.parser.setRoutine(self.currentRoutine)
+    def onGlobaleVariables(self, line):
+        self.parser=globalVarParser
+        self.parser.setRoutine(self.currentRoutine)
+    def onCalledRoutines(self,line):
+        self.parser=calledRoutineParser
+        self.parser.setRoutine(self.currentRoutine)
+    def onNakedGlobals(self, line):
+        self.parser=nakedGlobalParser
+        self.parser.setRoutine(self.currentRoutine)
+    def onMarkedItems(self, line):
+        self.parser=markedItemsParser
+        self.parser.setRoutine(self.currentRoutine)
+    def parseNameValuePair(self, line):
+        self.parser.parseLine(line)
+    def printResult(self):
+        print "Total Routines are %d" % len(self.allRoutines)  
+    def printRoutine(self, routineName): 
+        if routineName in self.allRoutines.keys():
+            self.allRoutines[routineName].printResult()
 #Routines starts with A followed by a number
 ARoutineEx=re.compile("^A[0-9]+$") 
+RoutineStart=re.compile("^Routine: (?P<name>[^ ]+)$")
+localVarStart=re.compile("^Local Variables +Routines")
+globalVarStart=re.compile("^Global Variables")
+nakedGlobalStart=re.compile("^Naked Globals")
+markedItemStart=re.compile("^Marked Items")
+calledRoutineStart=re.compile("^Routine +is Invoked by:")
+RoutineEnd=re.compile("-+ END -+")
+
 if __name__ == '__main__':
     routineFilePattern = "*/Routines/*.m"
     routineFileDir = "C:/cygwin/home/jason.li/git/VistA-FOIA/Packages/"
@@ -114,4 +217,49 @@ if __name__ == '__main__':
     
     
     # the step to parse the log file
-    callerGraphLogFile = "C:/Users/jason.li/"
+    callerGraphLogFile = "C:/Users/jason.li/build/VistaCache/Docs/CallerGraph/Accounts_Receivable.log"
+    file = open(callerGraphLogFile,'r');
+    logParser = CallerGraphLogFileParser()
+    for line in file:
+        #strip the newline
+        line = line.rstrip(os.linesep)
+        if (line.strip() == ''):
+            continue
+        result = RoutineStart.search(line)
+        if result:
+            routineName = result.group('name')
+            print "routine %s Started:" % routineName
+            logParser.onNewRoutineStart(routineName)
+            continue
+        if localVarStart.search(line):
+            print "localVar Started:"
+            logParser.onLocalVariablesStart(line)
+            continue
+        if globalVarStart.search(line):
+            print "global started:"
+            logParser.onGlobaleVariables(line)
+            continue
+        if nakedGlobalStart.search(line):
+            print "naked global started"
+            logParser.onNakedGlobals(line)
+            continue
+        if markedItemStart.search(line):
+            print "marked Item started"
+            logParser.onMarkedItems(line)
+            continue
+        if calledRoutineStart.search(line):
+            print "called routine started"
+            logParser.onCalledRoutines(line)
+            continue
+        if RoutineEnd.search(line):
+            print "routine End called"
+            logParser.onNewRoutineEnd(routineName)
+            continue
+        result=nameValuePair.search(line)
+        if result:
+#            print "Name: %s Value=%s" % (result.group("name"), result.group("value"))
+            logParser.parseNameValuePair(line)
+            continue
+    logParser.printResult()
+    logParser.printRoutine('PRCA219P')
+    print "end"
