@@ -105,6 +105,83 @@ class Routine:
                 write ("Package: %s \n" % routinePackageMap[var])
             else:
                 write("\n")
+    # print routine call graph in the graphviz dot format
+    def outputToDot(self):
+
+        if len(self.calledRoutines) == 0:
+            print("No called Routines found! for routine:%s") % (self.name)
+            return
+        localPackage=dict()
+        localPackage[routinePackageMap[self.name]]=set()
+        localPackage[routinePackageMap[self.name]].add(self.name)
+        for var in self.calledRoutines:
+            if var in routinePackageMap.keys():
+                if not localPackage[routinePackageMap[var]]:
+                    localPackage[routinePackageMap[var]]=set()
+                localPackage[routinePackageMap[var]].add(var)
+        try:
+            dirName=("c:/temp/VistA/%s/") % routinePackageMap[self.name]
+            if not os.path.exists(dirName):
+                os.makedirs(dirName)
+        except OSError:
+            print "Error making dir %s : Error: %s"  % (dirName, OSError)
+            return
+        output=open(("c:\temp\VistA/%s/%s.gv")%(routinePackageMap[self.name], self.name),'w')
+        output.write("digraph {\n")
+        for var in localPackage.key():
+            pass
+        
+        
+        outout.write("}\n")
+        
+    def printResultInC(self):
+        try:
+            dirName=("c:/temp/VistA/%s/") % routinePackageMap[self.name]
+            if not os.path.exists(dirName):
+                os.makedirs(dirName)
+        except OSError:
+            print "Error making dir %s : Error: %s"  % (dirName, OSError)
+            return
+        
+        file = open(("%s/%s.cpp") % (dirName, self.name), 'w')
+        if self.name in routinePackageMap.keys():
+            file.write(("/*! \\namespace %s \n") % (routinePackageMap[self.name]))
+            file.write("*/\n")
+            file.write("namespace %s {" % routinePackageMap[self.name])
+
+#        file.write("/* Global Vars: */\n")            
+#        for var in self.globalVariables:
+#            file.write( " int %s;\n" % var)
+#        file.write("\n")   
+#        file.write("/* Naked Globals: */\n")
+#        for var in self.nakedGlobals:
+#            file.write( " int %s;\n" % var)
+#        file.write("\n")
+#        file.write("/* Marked Items: */\n")
+#        for var in self.markedItems:
+#            file.write( " int %s;\n" % var)
+        file.write("\n")     
+        file.write("/*! \callgraph\n")
+        file.write("*/\n")
+        file.write ("void " + self.name+ "(){\n")
+#        if self.name in routinePackageMap.keys():
+#            write("Package Name: %s" % routinePackageMap[self.name])
+#        write("\n")
+        
+#        file.write("/* Local Vars: */\n")
+#        for var in self.localVariables:
+#            file.write(" int %s; \n" % var)
+
+
+        file.write("/* Called Routines: */\n")
+        for var in self.calledRoutines:
+            file.write( "  %s ();\n" % var)
+#            if var in routinePackageMap:
+#                write ("Package: %s \n" % routinePackageMap[var])
+#            else:
+        file.write("}\n")        
+        file.write("}// end of namespace")
+        file.close()    
         
 class Package:
     #constructor
@@ -230,7 +307,8 @@ class CallerGraphLogFileParser:
         print "Total Routines are %d" % len(self.allRoutines)  
     def printRoutine(self, routineName): 
         if routineName in self.allRoutines.keys():
-            self.allRoutines[routineName].printResult()
+#            self.allRoutines[routineName].printResult()
+            self.allRoutines[routineName].printResultInC()
         else:
             print "Routine: %s Not Found!" % routineName
 
@@ -309,7 +387,7 @@ if __name__ == '__main__':
     # the step to parse the log file
     #parse the log file
     callLogDir = "C:/Users/jason.li/build/VistaCache/Docs/CallerGraph"
-    callLogPattern="*.log"
+    callLogPattern="Toolkit.log"
     print "Starting Parsing all files...."
     print "Time is: %s" % datetime.now()
     parseAllCallerGraphLog(callLogDir, callLogPattern)
@@ -318,7 +396,8 @@ if __name__ == '__main__':
     routineFilePattern = "*/Routines/*.m"
     routineFileDir = "C:/cygwin/home/jason.li/git/VistA-FOIA/Packages/"
     findPackagesAndRoutinesBySource(routineFileDir, routineFilePattern)
-
+    for var in routinePackageMap.keys():
+        logParser.printRoutine(var)
     # read the user input from the terminal
     isExit=False
     while not isExit:
