@@ -282,17 +282,17 @@ class GraphvizRoutineVisit(RoutineVisit):
         output=open(os.path.join(dirName,routineName+".dot"),'w')
         output.write("digraph %s {\n" % routineName)
         if packageName not in localPackage.keys():
-            output.write("\tsubgraph %s{\n" % (var.replace(' ','_').replace('-','_')))
+            output.write("\tsubgraph \"cluster_%s\"{\n" % (var))
             output.write("\t\t" + routineName + ";\n")
             output.write("\t\tlabel=\"%s\";" % var)
             output.write("\t}\n")
         for var in localPackage.keys():
-            output.write("\tsubgraph %s{\n" % (var.replace(' ','_').replace('-','_')))
+            output.write("\tsubgraph \"cluster_%s\"{\n" % (var))
             if var == packageName:
                 output.write("\t\t%s->{" % routineName)
                 for val in localPackage[var]:
                     if val != routineName:
-                        output.write(val + ";")
+                        output.write(val + " ")
                 output.write("}\n")
             else:
                 for val in localPackage[var]:
@@ -305,9 +305,9 @@ class GraphvizRoutineVisit(RoutineVisit):
         output.write("}\n")
         output.close()
 
-        outputName = os.path.join(dirName,routineName+".png")
+        outputName = os.path.join(dirName,routineName+".svg")
         inputName=os.path.join(dirName,routineName+".dot")
-        command="dot -Tpng -o \"%s\" \"%s\"" % (outputName, inputName)
+        command="dot -Tsvg -o \"%s\" \"%s\"" % (outputName, inputName)
 #        print command
         retCode=subprocess.call(command)
         if retCode != 0:
@@ -360,8 +360,9 @@ class CallerGraphLogFileParser:
         else:
             pass
 #            print "Routine: %s Not Found!" % routineName
-
-
+    def getAllRoutines(self):
+        return self.allRoutines()
+    
 def findPackagesAndRoutinesBySource(dirName, pattern):
     searchFiles = glob.glob(os.path.join(dirName, pattern))
     print "Total Search Files are %d " % len(searchFiles)
@@ -429,9 +430,9 @@ def testDotCall():
     packageName="Nursing Service"
     routineName="NURA6F1"
     dirName = os.path.join("c:/temp/VistA/", packageName);
-    outputName = os.path.join(dirName,routineName+".png")
+    outputName = os.path.join(dirName,routineName+".svg")
     inputName=os.path.join(dirName,routineName+".dot")
-    command="dot -Tpng -o \"%s\" \"%s\"" % (outputName, inputName)
+    command="dot -Tsvg -o \"%s\" \"%s\"" % (outputName, inputName)
     retCode=subprocess.call(command)
     print "calling dot returns %d" % retCode
       
