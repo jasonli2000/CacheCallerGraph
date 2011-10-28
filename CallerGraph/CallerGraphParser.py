@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# A Wrapper around all the routine in a package
+# A parser to parse XINDEX log file and generate the routine documentation
 #---------------------------------------------------------------------------
 # Copyright 2011 The Open Source Electronic Health Record Agent
 #
@@ -27,7 +27,7 @@ import subprocess
 from datetime import datetime, date, time
 
 #Routines starts with A followed by a number
-ARoutineEx=re.compile("^A[0-9]+$") 
+ARoutineEx=re.compile("^A[0-9][^ ]+$") 
 
 nameValuePair=re.compile("^[ >]+ +(?P<name>[^ ]+) +(?P<value>[^ ]+)$")
 RoutineStart=re.compile("^Routine: (?P<name>[^ ]+)$")
@@ -39,8 +39,7 @@ routineInvokesStart=re.compile('Routine +Invokes')
 calledRoutineStart=re.compile("^Routine +is Invoked by:")
 RoutineEnd=re.compile("-+ END -+")
 
-routinePackageMap=dict()
-packageSet=set()
+
 write=sys.stdout.write
 
 class Routine:
@@ -79,11 +78,11 @@ class Routine:
         return self.calledRoutines
     def setPackage(self, package):
         self.package = package
+    def getPackage(self):
+        return self.package
     def printResult(self):
-        print "Routine Name: %s " % (self.name)
-        if self.name in routinePackageMap.keys():
-            write("Package Name: %s" % routinePackageMap[self.name])
-        write("\n")
+        write ("Routine Name: %s\n" % (self.name))
+        write("Package Name: %s\n" % self.package.getName())
         write("Local Vars: \n")
         for var in self.localVariables:
             write(" %s " % var)
@@ -102,25 +101,26 @@ class Routine:
         write("\n")
         write("Called Routines: \n")
         for var in self.calledRoutines:
-            write( " %s " % var)
-            if var in routinePackageMap:
-                write ("Package: %s \n" % routinePackageMap[var])
+            write( " %s " % var.getName())
+            if (var.getPackage()):
+                write ("Package: %s \n" % var.getPackage().getName())
             else:
                 write("\n")
-    def printResultInC(self):
-        try:
-            dirName=("c:/temp/VistA/%s/") % routinePackageMap[self.name]
-            if not os.path.exists(dirName):
-                os.makedirs(dirName)
-        except OSError:
-            print "Error making dir %s : Error: %s"  % (dirName, OSError)
-            return
-        
-        file = open(("%s/%s.cpp") % (dirName, self.name), 'w')
-        if self.name in routinePackageMap.keys():
-            file.write(("/*! \\namespace %s \n") % (routinePackageMap[self.name]))
-            file.write("*/\n")
-            file.write("namespace %s {" % routinePackageMap[self.name])
+                
+#    def printResultInC(self):
+#        try:
+#            dirName=("c:/temp/VistA/%s/") % routinePackageMap[self.name]
+#            if not os.path.exists(dirName):
+#                os.makedirs(dirName)
+#        except OSError:
+#            print "Error making dir %s : Error: %s"  % (dirName, OSError)
+#            return
+#        
+#        file = open(("%s/%s.cpp") % (dirName, self.name), 'w')
+#        if self.name in routinePackageMap.keys():
+#            file.write(("/*! \\namespace %s \n") % (routinePackageMap[self.name]))
+#            file.write("*/\n")
+#            file.write("namespace %s {" % routinePackageMap[self.name])
 
 #        file.write("/* Global Vars: */\n")            
 #        for var in self.globalVariables:
@@ -133,10 +133,10 @@ class Routine:
 #        file.write("/* Marked Items: */\n")
 #        for var in self.markedItems:
 #            file.write( " int %s;\n" % var)
-        file.write("\n")     
-        file.write("/*! \callgraph\n")
-        file.write("*/\n")
-        file.write ("void " + self.name+ "(){\n")
+#        file.write("\n")     
+#        file.write("/*! \callgraph\n")
+#        file.write("*/\n")
+#        file.write ("void " + self.name+ "(){\n")
 #        if self.name in routinePackageMap.keys():
 #            write("Package Name: %s" % routinePackageMap[self.name])
 #        write("\n")
@@ -144,17 +144,17 @@ class Routine:
 #        file.write("/* Local Vars: */\n")
 #        for var in self.localVariables:
 #            file.write(" int %s; \n" % var)
-
-
-        file.write("/* Called Routines: */\n")
-        for var in self.calledRoutines:
-            file.write( "  %s ();\n" % var)
+#
+#
+#        file.write("/* Called Routines: */\n")
+#        for var in self.calledRoutines:
+#            file.write( "  %s ();\n" % var)
 #            if var in routinePackageMap:
 #                write ("Package: %s \n" % routinePackageMap[var])
 #            else:
-        file.write("}\n")        
-        file.write("}// end of namespace")
-        file.close()    
+#        file.write("}\n")        
+#        file.write("}// end of namespace")
+#        file.close()    
         #subprocess to write to the ps file
 
     
@@ -176,7 +176,7 @@ class Package:
         return self.name
 
 class AbstractSectionParse:       
-    def parseLine(self, line):
+    def parseLine(self, line, logParse):
         pass
     def setRoutine(self, routine):
         pass
@@ -184,7 +184,7 @@ class AbstractSectionParse:
 class LocalVarSectionParse (AbstractSectionParse):
     def __init__(self):
         self.routine=None
-    def parseLine(self, line):
+    def parseLine(self, line, logParse):
         result = nameValuePair.search(line)
         if (result):
                 self.routine.addLocalVariables(result.group('name'))
@@ -194,7 +194,7 @@ class LocalVarSectionParse (AbstractSectionParse):
 class GlobalVarSectionParse (AbstractSectionParse):
     def __init__(self):
         self.routine=None
-    def parseLine(self, line):
+    def parseLine(self, line, logParser):
         result = nameValuePair.search(line)
         if (result):
                 self.routine.addGlobalVariables(result.group('name'))
@@ -204,7 +204,7 @@ class GlobalVarSectionParse (AbstractSectionParse):
 class NakedGlobalsSectionParser (AbstractSectionParse):
     def __init__(self):
         self.routine=None
-    def parseLine(self, line):
+    def parseLine(self, line, logParser):
         result = nameValuePair.search(line)
         if (result):
                 self.routine.addNakedGlobals(result.group('name'))
@@ -214,7 +214,7 @@ class NakedGlobalsSectionParser (AbstractSectionParse):
 class MarkedItemsSectionParser (AbstractSectionParse):
     def __init__(self):
         self.routine=None
-    def parseLine(self, line):
+    def parseLine(self, line, logParser):
         result = nameValuePair.search(line)
         if (result):
                 self.routine.addMarkedItem(result.group('name'))
@@ -224,14 +224,19 @@ class MarkedItemsSectionParser (AbstractSectionParse):
 class CalledRoutineSectionParser (AbstractSectionParse):
     def __init__(self):
         self.routine=None
-    def parseLine(self, line):
+    def parseLine(self, line, logParser):
         result = nameValuePair.search(line)
         if (result):
             routineDetail=result.group('name').split('^')
             routineName = routineDetail[len(routineDetail)-1]
             if routineName.startswith('%'):
                 routineName=routineName[1:]
-            self.routine.addCalledRoutines(routineName)
+            
+            if routineName in logParser.getAllRoutines():
+                routine=logParser.getAllRoutines()[routineName]
+                self.routine.addCalledRoutines(routine)
+            else:
+                print "RoutineName: %s is Not in any package" % routineName
     def setRoutine(self, routine):
         self.routine=routine    
 # global one 
@@ -244,33 +249,39 @@ calledRoutineParser=CalledRoutineSectionParser()
 # interface to generated the output based on a routine
 #===============================================================================
 class RoutineVisit:
-    def visitRoutine(self, routine, outputDir):
+    def visitRoutine(self, routine, outputDir=None):
         pass
 #===============================================================================
 # Default implementation of the routine 
 #===============================================================================    
 class DefaultRoutineVisit:
-    def visitRoutine(self, routine,outputDir):
+    def visitRoutine(self, routine,outputDir=None):
         routine.printResult()
 #===============================================================================
 # output result to use graphviz to generated the graph
 #===============================================================================
 class GraphvizRoutineVisit(RoutineVisit):
-    def visitRoutine(self,routine, outputDir):
-        routineName=routine.getName()
+    def visitRoutine(self, routine, outputDir):
         calledRoutines=routine.getCalledRoutines()
-        packageName = routinePackageMap[routineName]
+        if not calledRoutines or len(calledRoutines) == 0:
+            return
+        routineName=routine.getName()
+        if not routine.getPackage():
+            print "ERROR: routine: %s does not belongs to a package" % routineName
+            return
+        
+        packageName = routine.getPackage().getName()
         if len(calledRoutines) == 0:
             print("No called Routines found! for routine:%s") % (routineName)
             return
         localPackage=dict()
-        localPackage[routinePackageMap[routineName]]=set()
-        localPackage[routinePackageMap[routineName]].add(routineName)
+        localPackage[packageName]=set()
+        localPackage[packageName].add(routineName)
         for var in calledRoutines:
-            if var in routinePackageMap.keys():
-                if routinePackageMap[var] not in localPackage.keys():
-                    localPackage[routinePackageMap[var]]=set()
-                localPackage[routinePackageMap[var]].add(var)
+            if var.getPackage():
+                if var.getPackage().getName() not in localPackage.keys():
+                    localPackage[var.getPackage().getName()]=set()
+                localPackage[var.getPackage().getName()].add(var.getName())
         
         try:
             dirName=os.path.join(outputDir,packageName)
@@ -316,17 +327,17 @@ class GraphvizRoutineVisit(RoutineVisit):
 class CallerGraphLogFileParser:
     def __init__(self):
         self.allRoutines = dict()
+        self.allPackages = dict()
         self.currentRoutine=None
         self.parser=None
         
     def onNewRoutineStart(self, routineName):
-        if not self.currentRoutine:
-            self.currentRoutine = Routine(routineName)
-        if (routineName != self.currentRoutine):
-            self.currentRoutine = Routine(routineName)
-        
+        if routineName not in self.allRoutines.keys():
+            print "Invalid Routine: %s" % routineName
+            return
+        self.currentRoutine = self.allRoutines[routineName]
+
     def onNewRoutineEnd(self, routineName):
-        self.allRoutines[routineName] = self.currentRoutine
         self.currentRoutine = None
         
     def onLocalVariablesStart(self, line):
@@ -348,83 +359,94 @@ class CallerGraphLogFileParser:
         self.parser=None
     def parseNameValuePair(self, line):
         if self.parser:
-            self.parser.parseLine(line)
+            self.parser.parseLine(line,self)
     def printResult(self):
         print "Total Routines are %d" % len(self.allRoutines)  
+        
     def printRoutine(self, routineName, visitor=DefaultRoutineVisit()): 
         if routineName in self.allRoutines.keys():
 #            self.allRoutines[routineName].printResult()
 #            self.allRoutines[routineName].printResultInC()
             routine=self.allRoutines[routineName]
-            visitor.visitRoutine(routine,"C:/Temp/VistA/")
+            visitor.visitRoutine(routine)
         else:
-            pass
-#            print "Routine: %s Not Found!" % routineName
+            print "Routine: %s Not Found!" % routineName
     def getAllRoutines(self):
-        return self.allRoutines()
+        return self.allRoutines
     
-def findPackagesAndRoutinesBySource(dirName, pattern):
-    searchFiles = glob.glob(os.path.join(dirName, pattern))
-    print "Total Search Files are %d " % len(searchFiles)
-    for file in searchFiles:
-        routineName = os.path.basename(file).split(".")[0]
-        packageName = os.path.dirname(file)
-        packageName = packageName[packageName.index("Packages")+9:packageName.index("Routines")-1]
-        if packageName not in packageSet:
-            packageSet.add(packageName)
-        if routineName not in routinePackageMap.keys():
-            routinePackageMap[routineName]=packageName
-        else:
-            print ("Duplicated Routine name")
-        if ARoutineEx.search(routineName):
-            print "A Routines %s should be exempted" % routineName
+    def getAllPackages(self):
+        return self.allPackages
+    
+    #===========================================================================
+    # pass the log file and get all routines ready
+    #===========================================================================    
+    def parseAllCallerGraphLog(self, dirName, pattern): 
+        callerGraphLogFile = os.path.join(dirName, pattern)
+        allFiles=glob.glob(callerGraphLogFile)
+        for logFile in allFiles:
+            file = open(logFile,'r')
+            for line in file:
+                #strip the newline
+                line = line.rstrip(os.linesep)
+                #skip the empty line
+                if (line.strip() == ''):
+                    continue
+                result = RoutineStart.search(line)
+                if result:
+                    routineName = result.group('name')
+                    self.onNewRoutineStart(routineName)
+                    continue
+                if localVarStart.search(line):
+                    self.onLocalVariablesStart(line)
+                    continue
+                if globalVarStart.search(line):
+                    self.onGlobaleVariables(line)
+                    continue
+                if nakedGlobalStart.search(line):
+                    self.onNakedGlobals(line)
+                    continue
+                if markedItemStart.search(line):
+                    self.onMarkedItems(line)
+                    continue
+                if calledRoutineStart.search(line):
+                    self.onCalledRoutines(line)
+                    continue
+                if RoutineEnd.search(line):
+                    self.onNewRoutineEnd(routineName)
+                    continue
+                if routineInvokesStart.search(line):
+                    self.onRoutineInvokes(line)
+                    continue
+                result=nameValuePair.search(line)
+                if result:
+        #            print "Name: %s Value=%s" % (result.group("name"), result.group("value"))
+                    self.parseNameValuePair(line)
+                    continue
+                
+    #===========================================================================
+    # find all the package name and routines by reading the repository directory
+    #===========================================================================
+    def findPackagesAndRoutinesBySource(self,dirName, pattern):
+        searchFiles = glob.glob(os.path.join(dirName, pattern))
+        print "Total Search Files are %d " % len(searchFiles)
+        for file in searchFiles:
+            routineName = os.path.basename(file).split(".")[0]
+            packageName = os.path.dirname(file)
+            packageName = packageName[packageName.index("Packages")+9:packageName.index("Routines")-1]
+            if packageName not in self.allPackages.keys():
+                self.allPackages[packageName]=Package(packageName)
+            if routineName not in self.allRoutines.keys():
+                self.allRoutines[routineName]=Routine(routineName)
+            else:
+                print ("Duplicated Routine name")
+            self.allPackages[packageName].addToPackage(self.allRoutines[routineName])
+            self.allRoutines[routineName].setPackage(self.allPackages[packageName])
+            if ARoutineEx.search(routineName):
+                print "A Routines %s should be exempted" % routineName
+            
+        print "Total package is %d and Total Routines are %d" % (len(self.allPackages), len(self.allRoutines))  
         
-    print "Total package is %d and Total Routines are %d" % (len(packageSet), len(routinePackageMap))  
-
-logParser = CallerGraphLogFileParser()
-def parseAllCallerGraphLog(dirName, pattern): 
-    callerGraphLogFile = os.path.join(dirName, pattern)
-
-    allFiles=glob.glob(callerGraphLogFile)
-    for logFile in allFiles:
-        file = open(logFile,'r')
-        for line in file:
-            #strip the newline
-            line = line.rstrip(os.linesep)
-            if (line.strip() == ''):
-                continue
-            result = RoutineStart.search(line)
-            if result:
-                routineName = result.group('name')
-                logParser.onNewRoutineStart(routineName)
-                continue
-            if localVarStart.search(line):
-                logParser.onLocalVariablesStart(line)
-                continue
-            if globalVarStart.search(line):
-                logParser.onGlobaleVariables(line)
-                continue
-            if nakedGlobalStart.search(line):
-                logParser.onNakedGlobals(line)
-                continue
-            if markedItemStart.search(line):
-                logParser.onMarkedItems(line)
-                continue
-            if calledRoutineStart.search(line):
-                logParser.onCalledRoutines(line)
-                continue
-            if RoutineEnd.search(line):
-                logParser.onNewRoutineEnd(routineName)
-                continue
-            if routineInvokesStart.search(line):
-                logParser.onRoutineInvokes(line)
-                continue
-            result=nameValuePair.search(line)
-            if result:
-    #            print "Name: %s Value=%s" % (result.group("name"), result.group("value"))
-                logParser.parseNameValuePair(line)
-                continue
-    logParser.printResult()
+# end of class CallerGraphLogFileParser
     
 def testDotCall():
     packageName="Nursing Service"
@@ -433,6 +455,7 @@ def testDotCall():
     outputName = os.path.join(dirName,routineName+".svg")
     inputName=os.path.join(dirName,routineName+".dot")
     command="dot -Tsvg -o \"%s\" \"%s\"" % (outputName, inputName)
+    print "command is [%s]" % command
     retCode=subprocess.call(command)
     print "calling dot returns %d" % retCode
       
@@ -441,27 +464,28 @@ if __name__ == '__main__':
     #parse the log file
 #    testDotCall()
 #    exit()
-    callLogDir = "C:/Users/jason.li/build/VistaCache/Docs/CallerGraph"
-    callLogPattern="Nursing_Service.log"
-    print "Starting Parsing all files...."
-    print "Time is: %s" % datetime.now()
-    parseAllCallerGraphLog(callLogDir, callLogPattern)
-    print "End of parsing all files......"
+    logParser=CallerGraphLogFileParser()
+    print "Starting parsing package/routine relationship...."
     print "Time is: %s" % datetime.now()
     routineFilePattern = "*/Routines/*.m"
     routineFileDir = "C:/cygwin/home/jason.li/git/VistA-FOIA/Packages/"
-    findPackagesAndRoutinesBySource(routineFileDir, routineFilePattern)
-    for var in routinePackageMap.keys():
-        logParser.printRoutine(var, GraphvizRoutineVisit())
-    # read the user input from the terminal
-    isExit=False
-    while not isExit:
-        var = raw_input("Please enter the routine Name:")
-        if (var == 'quit'):
-            isExit=True
-            break
-        else:
-            if var in routinePackageMap.keys():
-                logParser.printRoutine(var)
-            else:
-                print "Routine: %s NOT FOUND!" % var          
+    logParser.findPackagesAndRoutinesBySource(routineFileDir, routineFilePattern)
+    print "End parsing package/routine relationship...."
+    print "Time is: %s" % datetime.now()
+    
+    print "Starting parsing caller graph log file...."    
+    callLogDir = "C:/Users/jason.li/build/VistaCache/Docs/CallerGraph"
+    callLogPattern="*.log"
+    logParser.parseAllCallerGraphLog(callLogDir, callLogPattern)
+    print "End of parsing log file......"
+    print "Time is: %s" % datetime.now()
+    # generate all dot file and use dot to generated the svg file format
+    dotRoutineVisitor = GraphvizRoutineVisit()
+    
+    print "Start generating caller graph......"
+    print "Time is: %s" % datetime.now()    
+    for var in logParser.getAllRoutines().values():
+        dotRoutineVisitor.visitRoutine(var, "C:/Temp/VistA")
+    print "End of generating caller graph......"
+    print "Time is: %s" % datetime.now()
+
