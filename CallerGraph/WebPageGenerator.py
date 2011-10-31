@@ -95,6 +95,12 @@ class WebPageGenerator:
     def __init__(self, allPackages, outDir):
         self.allPackages=allPackages
         self.outDir=outDir
+    def generateWebPage(self):
+        generateIndexPage();
+        generateCallerGraph(self.outDir)
+        generatePackagePage()
+        generateIndividualPackagePage()
+        generateIndividualRoutinePage()
     def generateIndexPage(self):
         pass
     def generateCallerGraph(self, outDir):  
@@ -108,10 +114,11 @@ class WebPageGenerator:
         file.write("<div class=\"header\">\n")
         file.write("<div class=\"headertitle\">")
         file.write("<h1>Package List</h1>\n</div>\n</div>")
-        file.write("<div class=\"contents\">\n")
+        file.write("<div class=\"contents\"><table>\n")
         #generated the table
         for package in self.allPackages.keys():
-            file.write("<tr><td class=\"indexkey\"><a class=\"e1\" href=\"%s\">\n" % "Package_" + package.replace(' ','_')+".html" )
+            file.write("<tr><td class=\"indexkey\"><a class=\"e1\" href=\"%s\">%s</a></td><td class=\"indexvalue\"></td></tr>\n" 
+                       % ("Package_" + package.replace(' ','_')+".html", package))
         file.write("</table>\n</div>\n")
         file.write("</body>\n</html>\n")
         file.close()
@@ -126,9 +133,10 @@ class WebPageGenerator:
             file.write("<div class=\"header\">\n")
             file.write("<div class=\"headertitle\">")
             file.write("<h1>Package %s</h1>\n</div>\n</div>" % package)
-            file.write("<div class=\"contents\">\n")
+            file.write("<div class=\"contents\"><table>\n")
             for routine in package.getAllRoutines().keys():
-                file.write("<tr><td class=\"indexkey\"><a class=\"e1\" href=\"%s\">\n" % ("Routine_"+ routine+".html" ))
+                file.write("<tr><td class=\"indexkey\"><a class=\"e1\" href=\"%s\">%s</a></td><td class=\"indexvalue\"></td></tr>\n" 
+                           % ("Routine_"+ routine+".html", routine ))
             file.write("</table>\n</div>\n")
             file.write("</body>\n</html>\n")
         file.close()
@@ -142,9 +150,28 @@ class WebPageGenerator:
                     file.write(line)
                 file.write("<div class=\"header\">\n")
                 file.write("<div class=\"headertitle\">")
-                file.write("<h1>Package %s</h1>\n</div>\n</div>" % package)
-                file.write("<div class=\"contents\">\n")
-                       
+                file.write("<h1>Routine %s</h1>\n</div>\n</div>" % routine)
+                file.write("<div class=\"contents\"><table>\n")
+                for localVar in routine.getLocalVariables():
+                    file.write("<tr><td class=\"indexkey\">%s</td><td class=\"indexvalue\">%s</td></tr>\n" 
+                               % ("Local Variables", localVar))
+                for globalVar in routine.getGlobalVariables():
+                    file.write("<tr><td class=\"indexkey\">%s</td><td class=\"indexvalue\">%s</td></tr>\n" 
+                               % ("Global Variables", gloablVar))
+                for nakedGlobal in routine.getNakedGlobals():
+                    file.write("<tr><td class=\"indexkey\">%s</td><td class=\"indexvalue\">%s</td></tr>\n" 
+                               % ("Naked Global", nakedGlobal))
+                for markedItem in routine.getMarkedItems():
+                    file.write("<tr><td class=\"indexkey\">%s</td><td class=\"indexvalue\">%s</td></tr>\n" 
+                               % ("Marked Items", nakedGlobal))
+                for calledRoutine in routine.getCalledRoutines():
+                    file.write("<tr><td class=\"indexkey\">%s</td><td class=\"indexvalue\">%s</td></tr>\n" 
+                               % ("Called Routines", calledRoutine))
+                # write the image of the caller graph
+                file.write("<div class=\"left\"><img src=\"%s\" border=\"0\" alt=\"Call Graph\">\n" 
+                           % (package+"/"+routine))
+
+
             
 if __name__ == '__main__':   
     logParser = CallerGraphParser.CallerGraphLogFileParser()
@@ -171,3 +198,5 @@ if __name__ == '__main__':
 #        dotRoutineVisitor.visitRoutine(var, "C:/Temp/VistA")
         print
     print "End of generating caller graph......"
+    webPageGen=WebPageGenerator(logParse.getAllPackages(),"C:/Temp/VistA")
+    webPageGen.generateWebPage()
