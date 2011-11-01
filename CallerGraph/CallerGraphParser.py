@@ -62,15 +62,15 @@ class Routine:
         return self.localVariables
     def addGlobalVariables(self, globalVariables):
         self.globalVariables.append(globalVariables)
-    def getGlobalVaribales(self):
+    def getGlobalVariables(self):
         return self.globalVariables
     def addNakedGlobals(self, globals):
         self.nakedGlobals.append(globals)
     def getNakedGlobals(self):
         return self.nakedGlobals
-    def addMarkedItem(self, markedItem):
+    def addMarkedItems(self, markedItem):
         self.markedItems.append(markedItem)
-    def getMarkedItem(self):
+    def getMarkedItems(self):
         return self.markedItems
     def addCalledRoutines(self, Routine):
         self.calledRoutines.add(Routine)
@@ -217,7 +217,7 @@ class MarkedItemsSectionParser (AbstractSectionParse):
     def parseLine(self, line, logParser):
         result = nameValuePair.search(line)
         if (result):
-                self.routine.addMarkedItem(result.group('name'))
+                self.routine.addMarkedItems(result.group('name'))
     def setRoutine(self, routine):
         self.routine=routine
                         
