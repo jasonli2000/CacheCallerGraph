@@ -22,6 +22,7 @@ import sys
 import subprocess
 import urllib
 import string
+import bisect
 
 from datetime import datetime, date, time
 
@@ -109,6 +110,7 @@ def getPackageHypefLinkByName(packageName):
 def normalizePackageName(packageName):
     return packageName.replace(' ','_')
 
+# generate index bar based on input list
 def generateIndexBar(outputFile, inputList):
     if (not inputList) or len(inputList) == 0:
         return
@@ -117,18 +119,69 @@ def generateIndexBar(outputFile, inputList):
         outputFile.write("<a class=\"qindex\" href=\"#%s\">%s</a>&nbsp;|&nbsp;\n" % (inputList[i], inputList[i]))
     outputFile.write("<a class=\"qindex\" href=\"#%s\">%s</a></div>\n" % (inputList[-1], inputList[-1]))
 
+# generated 
+def generateIndexedPackageTableRow(outputFile, inputList):
+    if not inputList or len(inputList) == 0:
+        return
+    outputFile.write("<tr>")
+    for item in inputList:
+        if item in string.uppercase:
+            outputFile.write("<td><a name=\"%s\"></a><table border=\"0\" cellspacing=\"0\" cellpadding=\"0\"><tr><td><div class=\"ah\">&nbsp;&nbsp;%s&nbsp;&nbsp;</div></td></tr></table></td>" % (item, item))
+        else:
+            outputFile.write("<td><a class=\"el\" href=\"%s\">%s</a>&nbsp;&nbsp;&nbsp;</td>" % (getPackageHtmlFileName(item), item))
+    outputFile.write("</tr>\n")
+
+def generateIndexedRoutineTableRow(outputFile, inputList):
+    if not inputList or len(inputList) == 0:
+        return
+    outputFile.write("<tr>")
+    for item in inputList:
+        if item in string.uppercase:
+            outputFile.write("<td><a name=\"%s\"></a><table border=\"0\" cellspacing=\"0\" cellpadding=\"0\"><tr><td><div class=\"ah\">&nbsp;&nbsp;%s&nbsp;&nbsp;</div></td></tr></table></td>" % (item, item))
+        else:
+            outputFile.write("<td><a class=\"el\" href=\"%s\">%s</a>&nbsp;&nbsp;&nbsp;</td>" % (getRoutineHtmlFileName(item), item))
+    outputFile.write("</tr>\n")
+
 class WebPageGenerator:
-    def __init__(self, allPackages, outDir):
+    def __init__(self, allPackages, allRoutines, outDir):
         self.allPackages=allPackages
+        self.allRoutines=allRoutines
         self.outDir=outDir
     def generateWebPage(self):
-#        self.generateIndexPage()
+#        self.generateRoutineIndexPage()
 #        self.generateCallerGraph(self.outDir)
         self.generatePackagePage()
-#        self.generateIndividualPackagePage()
+        self.generateIndividualPackagePage()
 #        self.generateIndividualRoutinePage()
-    def generateIndexPage(self):
-        pass
+    # index all routines
+    def generateRoutineIndexPage(self):
+        header = open(os.path.join(self.outDir,"header.html"),'r')
+        outputFile = open(os.path.join(self.outDir,"routines.html"),'w')  
+        for line in header:
+            outputFile.write(line)
+        outputFile.write("<div class=\"header\">\n")
+        outputFile.write("<div class=\"headertitle\">")
+        outputFile.write("<h1>Routine Index List</h1>\n</div>\n</div>")
+        generateIndexBar(outputFile, string.uppercase)
+        outputFile.write("<div class=\"contents\">\n")
+        sortedRoutines=sorted(self.allRoutines.keys())
+        for letter in string.uppercase:
+            bisect.insort_left(sortedRoutines,letter)
+        totalRoutines=len(sortedRoutines)+len(string.uppercase)
+        totalCol=4
+        numPerCol=totalRoutines/totalCol+1
+        outputFile.write("<table align=\"center\" width=\"95%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\">\n")
+        for i in range(numPerCol):
+            itemsPerRow=[];
+            for j in range(totalCol):
+                if (i+numPerCol*j)<totalNumPackages:
+                    itemsPerRow.append(sortedPackages[i+j*numPerCol]);
+            generateIndexedPackageTableRow(outputFile,itemsPerRow)        
+        outputFile.write("</table>\n</div>\n")
+        generateIndexBar(outputFile, string.uppercase)
+        outputFile.write("</body>\n</html>\n")
+        outputFile.close()
+        
     def generateCallerGraph(self, outDir):  
         pass
     def generatePackagePage(self):
@@ -141,12 +194,25 @@ class WebPageGenerator:
         outputFile.write("<div class=\"headertitle\">")
         outputFile.write("<h1>Package List</h1>\n</div>\n</div>")
         generateIndexBar(outputFile, string.uppercase)
-        outputFile.write("<div class=\"contents\"><table>\n")
+        outputFile.write("<div class=\"contents\">\n")
         #generated the table
-        for package in sorted(self.allPackages.keys()):
-            outputFile.write("<tr><td class=\"indexkey\"><a class=\"e1\" href=\"%s\">%s</a></td></tr>\n" 
-                       % (getPackageHtmlFileName(package), package))
+        totalNumPackages=len(self.allPackages) + len(string.uppercase)
+        totalCol=3
+        # list in three columns
+        numPerCol=totalNumPackages/totalCol+1
+        sortedPackages = sorted(self.allPackages.keys())
+        for letter in string.uppercase:
+            bisect.insort_left(sortedPackages,letter)
+        # write the table first
+        outputFile.write("<table align=\"center\" width=\"95%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\">\n")
+        for i in range(numPerCol):
+            itemsPerRow=[];
+            for j in range(totalCol):
+                if (i+numPerCol*j)<totalNumPackages:
+                    itemsPerRow.append(sortedPackages[i+j*numPerCol]);
+            generateIndexedPackageTableRow(outputFile,itemsPerRow)
         outputFile.write("</table>\n</div>\n")
+        generateIndexBar(outputFile, string.uppercase)
         outputFile.write("</body>\n</html>\n")
         outputFile.close()
         header.close()
@@ -165,13 +231,23 @@ class WebPageGenerator:
             outputFile.write("<div class=\"header\">\n")
             outputFile.write("<div class=\"headertitle\">")
             outputFile.write("<h1>Package %s</h1>\n</div>\n</div>" % package)
+            outputFile.write("<a name=\"All Routines\"/><h2 align=\"left\">All Routines</h2>")
             outputFile.write("<div class=\"contents\"><table>\n")
-            for routine in sorted(self.allPackages[package].getAllRoutines().keys()):
-                outputFile.write("<tr><td class=\"indexkey\"><a class=\"e1\" href=\"%s\">%s</a></td>\n" 
-                           % (getRoutineHtmlFileName(routine), routine ))
+            sortedRoutines=sorted(self.allPackages[package].getAllRoutines().keys())
+            totalNumRoutine = len(sortedRoutines)
+            totalCol=8
+            numPerCol = totalNumRoutine/totalCol+1
+            if totalNumRoutine > 0:
+                for index in range(numPerCol):
+                    outputFile.write("<tr>")
+                    for i in range(totalCol):
+                        if (index+i*numPerCol) < totalNumRoutine:
+                            outputFile.write("<td class=\"indexkey\"><a class=\"e1\" href=\"%s\">%s</a>&nbsp;&nbsp;&nbsp;&nbsp;</td>" 
+                                       % (getRoutineHtmlFileName(sortedRoutines[index+i*numPerCol]), sortedRoutines[index+i*numPerCol] ))
+                    outputFile.write("</tr>\n")
             outputFile.write("</table>\n</div>\n")
             outputFile.write("</body>\n</html>\n")
-        outputFile.close()
+            outputFile.close()
 
     def generateIndividualRoutinePage(self):
         header = open(os.path.join(self.outDir,"header.html"),'r')
@@ -251,7 +327,7 @@ class WebPageGenerator:
                 outputFile.write("</body>\n</html>\n")
                 outputFile.close()
 
-def testGeneIndexList(inputList):
+def testGenerateIndexBar(inputList):
     outputFile=open("C:/Temp/VistA/Test.html", 'w')
     outputFile.write("<html><head>Test</head><body>\n")
     generateIndexBar(outputFile, inputList)
@@ -297,6 +373,6 @@ if __name__ == '__main__':
 #    print "End of generating caller graph......"
     
     print "Starting generating web pages...."
-    webPageGen=WebPageGenerator(logParser.getAllPackages(),"C:/Temp/VistA")
+    webPageGen=WebPageGenerator(logParser.getAllPackages(), logParser.getAllRoutines(),"C:/Temp/VistA")
     webPageGen.generateWebPage()
     print "End of generating web pages...."
