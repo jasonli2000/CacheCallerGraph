@@ -236,7 +236,9 @@ class CalledRoutineSectionParser (AbstractSectionParse):
                 routine=logParser.getAllRoutines()[routineName]
                 self.routine.addCalledRoutines(routine)
             else:
-                print "RoutineName: %s is Not in any package" % routineName
+                print ("Routine: [%s] called Routine: %s is Not in any package" 
+                      % (self.routine.getName(), routineName))
+                self.routine.addCalledRoutines(Routine(routineName))
     def setRoutine(self, routine):
         self.routine=routine    
 # global one 
@@ -382,17 +384,7 @@ class CallerGraphLogFileParser:
         
 # end of class CallerGraphLogFileParser
     
-def testDotCall():
-    packageName="Nursing Service"
-    routineName="NURA6F1"
-    dirName = os.path.join("c:/temp/VistA/", packageName);
-    outputName = os.path.join(dirName,routineName+".svg")
-    inputName=os.path.join(dirName,routineName+".dot")
-    command="dot -Tsvg -o \"%s\" \"%s\"" % (outputName, inputName)
-    print "command is [%s]" % command
-    retCode=subprocess.call(command)
-    print "calling dot returns %d" % retCode
-      
+
 if __name__ == '__main__':
     # the step to parse the log file
     #parse the log file

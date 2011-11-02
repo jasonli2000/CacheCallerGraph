@@ -21,6 +21,7 @@ import os.path
 import sys
 import subprocess
 import urllib
+import string
 
 from datetime import datetime, date, time
 
@@ -108,6 +109,14 @@ def getPackageHypefLinkByName(packageName):
 def normalizePackageName(packageName):
     return packageName.replace(' ','_')
 
+def generateIndexBar(outputFile, inputList):
+    if (not inputList) or len(inputList) == 0:
+        return
+    outputFile.write("<div class=\"qindex\">\n")
+    for i in range(len(inputList)-1):
+        outputFile.write("<a class=\"qindex\" href=\"#%s\">%s</a>&nbsp;|&nbsp;\n" % (inputList[i], inputList[i]))
+    outputFile.write("<a class=\"qindex\" href=\"#%s\">%s</a></div>\n" % (inputList[-1], inputList[-1]))
+
 class WebPageGenerator:
     def __init__(self, allPackages, outDir):
         self.allPackages=allPackages
@@ -115,30 +124,31 @@ class WebPageGenerator:
     def generateWebPage(self):
 #        self.generateIndexPage()
 #        self.generateCallerGraph(self.outDir)
-#        self.generatePackagePage()
+        self.generatePackagePage()
 #        self.generateIndividualPackagePage()
-        self.generateIndividualRoutinePage()
+#        self.generateIndividualRoutinePage()
     def generateIndexPage(self):
         pass
     def generateCallerGraph(self, outDir):  
         pass
     def generatePackagePage(self):
         header = open(os.path.join(self.outDir,"header.html"),'r')
-        file = open(os.path.join(self.outDir,"packages.html"),'w')
+        outputFile = open(os.path.join(self.outDir,"packages.html"),'w')
         for line in header:
-            file.write(line)
+            outputFile.write(line)
         #write the header
-        file.write("<div class=\"header\">\n")
-        file.write("<div class=\"headertitle\">")
-        file.write("<h1>Package List</h1>\n</div>\n</div>")
-        file.write("<div class=\"contents\"><table>\n")
+        outputFile.write("<div class=\"header\">\n")
+        outputFile.write("<div class=\"headertitle\">")
+        outputFile.write("<h1>Package List</h1>\n</div>\n</div>")
+        generateIndexBar(outputFile, string.uppercase)
+        outputFile.write("<div class=\"contents\"><table>\n")
         #generated the table
         for package in sorted(self.allPackages.keys()):
-            file.write("<tr><td class=\"indexkey\"><a class=\"e1\" href=\"%s\">%s</a></td><td class=\"indexvalue\"></td></tr>\n" 
+            outputFile.write("<tr><td class=\"indexkey\"><a class=\"e1\" href=\"%s\">%s</a></td></tr>\n" 
                        % (getPackageHtmlFileName(package), package))
-        file.write("</table>\n</div>\n")
-        file.write("</body>\n</html>\n")
-        file.close()
+        outputFile.write("</table>\n</div>\n")
+        outputFile.write("</body>\n</html>\n")
+        outputFile.close()
         header.close()
     #generate the individual package pages
     def generateIndividualPackagePage(self):
@@ -157,19 +167,11 @@ class WebPageGenerator:
             outputFile.write("<h1>Package %s</h1>\n</div>\n</div>" % package)
             outputFile.write("<div class=\"contents\"><table>\n")
             for routine in sorted(self.allPackages[package].getAllRoutines().keys()):
-                outputFile.write("<tr><td class=\"indexkey\"><a class=\"e1\" href=\"%s\">%s</a></td><td class=\"indexvalue\"></td></tr>\n" 
+                outputFile.write("<tr><td class=\"indexkey\"><a class=\"e1\" href=\"%s\">%s</a></td>\n" 
                            % (getRoutineHtmlFileName(routine), routine ))
             outputFile.write("</table>\n</div>\n")
             outputFile.write("</body>\n</html>\n")
         outputFile.close()
-
-    def generateIndexBar(self, outputFile, inputList):
-        if (not inputList) or len(inputList) == 0:
-            return
-        outputFile.write("<div class=\"qindex\">\n")
-        for i in range(len(inputList)-1):
-            outputFile.write("<a class=\"qindex\" href=\"#%s\">%s</a>&nbsp;|&nbsp;\n" % (inputList[i], inputList[i]))
-        outputFile.write("<a class=\"qindex\" href=\"#%s\">%s</a></div>\n" % (inputList[-1], inputList[-1]))
 
     def generateIndividualRoutinePage(self):
         header = open(os.path.join(self.outDir,"header.html"),'r')
@@ -186,10 +188,10 @@ class WebPageGenerator:
                 for line in headerLines:
                     outputFile.write(line)
                 # generated the qindex bar
-                self.generateIndexBar(outputFile, indexList)
+                generateIndexBar(outputFile, indexList)
                 outputFile.write("<div class=\"header\">\n")
                 outputFile.write("<div class=\"headertitle\">")
-                outputFile.write("<h1>Package %s</h1>\n</div>\n</div>" % getPackageHypefLinkByName(package))
+                outputFile.write("<h4>Package %s</h4>\n</div>\n</div>" % getPackageHypefLinkByName(package))
                 outputFile.write("<h1>Routine %s</h1>\n</div>\n</div>" % routineName)
                 outputFile.write("<a name=\"Call Graph\"/><h2 align=\"left\">Call Graph</h2>")
                 calledRoutines = routine.getCalledRoutines()
@@ -211,11 +213,12 @@ class WebPageGenerator:
                     outputFile.write("<tr><th class=\"indexkey\">Called Routine Name</th><th class=\"indexvalue\">Package</th></tr>\n")
                     for calledRoutine in routine.getCalledRoutines():
                         routinePackageLink=""
-                        calledRoutineName=calledRoutine.getName()
+                        calledRoutineNameLink=calledRoutine.getName()
                         if (calledRoutine.getPackage()):
                             routinePackageLink = getPackageHypefLinkByName(calledRoutine.getPackage().getName())
+                            calledRoutineNameLink = getRoutineHypeLinkByName(calledRoutineNameLink)
                         outputFile.write("<tr><td class=\"indexkey\">%s</td><td class=\"indexvalue\">%s</td></tr>\n" 
-                                   % (getRoutineHypeLinkByName(calledRoutineName), routinePackageLink))
+                                   % (calledRoutineNameLink, routinePackageLink))
                     outputFile.write("</table>\n</div>\n")
 
                 outputFile.write("<a name=\"Local Variables\"/><h2 align=\"left\"> Local Variables</h2>\n")
@@ -244,12 +247,30 @@ class WebPageGenerator:
                 outputFile.write("</table></div>\n")
                 
                 # generated the index bar at the bottom
-                self.generateIndexBar(outputFile, indexList)
+                generateIndexBar(outputFile, indexList)
                 outputFile.write("</body>\n</html>\n")
                 outputFile.close()
 
-            
-if __name__ == '__main__':   
+def testGeneIndexList(inputList):
+    outputFile=open("C:/Temp/VistA/Test.html", 'w')
+    outputFile.write("<html><head>Test</head><body>\n")
+    generateIndexBar(outputFile, inputList)
+    outputFile.write("</body></html>")
+    outputFile.close()
+
+#test to play around the Dot            
+def testDotCall():
+    packageName="Nursing Service"
+    routineName="NURA6F1"
+    dirName = os.path.join("c:/temp/VistA/", packageName);
+    outputName = os.path.join(dirName,routineName+".svg")
+    inputName=os.path.join(dirName,routineName+".dot")
+    command="dot -Tsvg -o \"%s\" \"%s\"" % (outputName, inputName)
+    print "command is [%s]" % command
+    retCode=subprocess.call(command)
+    print "calling dot returns %d" % retCode
+      
+if __name__ == '__main__':
     logParser = CallerGraphParser.CallerGraphLogFileParser()
     print "Starting parsing package/routine relationship...."
     print "Time is: %s" % datetime.now()
