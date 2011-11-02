@@ -148,11 +148,11 @@ class WebPageGenerator:
         self.allRoutines=allRoutines
         self.outDir=outDir
     def generateWebPage(self):
-#        self.generateRoutineIndexPage()
-#        self.generateCallerGraph(self.outDir)
+        self.generateRoutineIndexPage()
+        self.generateCallerGraph(self.outDir)
         self.generatePackagePage()
         self.generateIndividualPackagePage()
-#        self.generateIndividualRoutinePage()
+        self.generateIndividualRoutinePage()
     # index all routines
     def generateRoutineIndexPage(self):
         header = open(os.path.join(self.outDir,"header.html"),'r')
@@ -167,16 +167,16 @@ class WebPageGenerator:
         sortedRoutines=sorted(self.allRoutines.keys())
         for letter in string.uppercase:
             bisect.insort_left(sortedRoutines,letter)
-        totalRoutines=len(sortedRoutines)+len(string.uppercase)
+        totalRoutines=len(sortedRoutines)
         totalCol=4
         numPerCol=totalRoutines/totalCol+1
         outputFile.write("<table align=\"center\" width=\"95%\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\">\n")
         for i in range(numPerCol):
             itemsPerRow=[];
             for j in range(totalCol):
-                if (i+numPerCol*j)<totalNumPackages:
-                    itemsPerRow.append(sortedPackages[i+j*numPerCol]);
-            generateIndexedPackageTableRow(outputFile,itemsPerRow)        
+                if (i+numPerCol*j)<totalRoutines:
+                    itemsPerRow.append(sortedRoutines[i+numPerCol*j]);
+            generateIndexedRoutineTableRow(outputFile,itemsPerRow)        
         outputFile.write("</table>\n</div>\n")
         generateIndexBar(outputFile, string.uppercase)
         outputFile.write("</body>\n</html>\n")

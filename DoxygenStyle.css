@@ -136,6 +136,32 @@ TD.indexvalue {
        margin-bottom  : 2px;
        border: 1px solid #CCCCCC;
 }
+TH.indexkey {
+       background-color: #e8eef2;
+       font-weight: bold;
+       padding-right  : 10px;
+       padding-top    : 2px;
+       padding-left   : 10px;
+       padding-bottom : 2px;
+       margin-left    : 0px;
+       margin-right   : 0px;
+       margin-top     : 2px;
+       margin-bottom  : 2px;
+       border: 1px solid #CCCCCC;
+}
+TH.indexvalue {
+       background-color: #e8eef2;
+       font-style: italic;
+       padding-right  : 10px;
+       padding-top    : 2px;
+       padding-left   : 10px;
+       padding-bottom : 2px;
+       margin-left    : 0px;
+       margin-right   : 0px;
+       margin-top     : 2px;
+       margin-bottom  : 2px;
+       border: 1px solid #CCCCCC;
+}
 TR.memlist {
   background-color: #f0f0f0;
 }
