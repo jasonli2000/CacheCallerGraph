@@ -107,55 +107,7 @@ class Routine:
             else:
                 write("\n")
                 
-#    def printResultInC(self):
-#        try:
-#            dirName=("c:/temp/VistA/%s/") % routinePackageMap[self.name]
-#            if not os.path.exists(dirName):
-#                os.makedirs(dirName)
-#        except OSError:
-#            print "Error making dir %s : Error: %s"  % (dirName, OSError)
-#            return
-#        
-#        file = open(("%s/%s.cpp") % (dirName, self.name), 'w')
-#        if self.name in routinePackageMap.keys():
-#            file.write(("/*! \\namespace %s \n") % (routinePackageMap[self.name]))
-#            file.write("*/\n")
-#            file.write("namespace %s {" % routinePackageMap[self.name])
 
-#        file.write("/* Global Vars: */\n")            
-#        for var in self.globalVariables:
-#            file.write( " int %s;\n" % var)
-#        file.write("\n")   
-#        file.write("/* Naked Globals: */\n")
-#        for var in self.nakedGlobals:
-#            file.write( " int %s;\n" % var)
-#        file.write("\n")
-#        file.write("/* Marked Items: */\n")
-#        for var in self.markedItems:
-#            file.write( " int %s;\n" % var)
-#        file.write("\n")     
-#        file.write("/*! \callgraph\n")
-#        file.write("*/\n")
-#        file.write ("void " + self.name+ "(){\n")
-#        if self.name in routinePackageMap.keys():
-#            write("Package Name: %s" % routinePackageMap[self.name])
-#        write("\n")
-        
-#        file.write("/* Local Vars: */\n")
-#        for var in self.localVariables:
-#            file.write(" int %s; \n" % var)
-#
-#
-#        file.write("/* Called Routines: */\n")
-#        for var in self.calledRoutines:
-#            file.write( "  %s ();\n" % var)
-#            if var in routinePackageMap:
-#                write ("Package: %s \n" % routinePackageMap[var])
-#            else:
-#        file.write("}\n")        
-#        file.write("}// end of namespace")
-#        file.close()    
-        #subprocess to write to the ps file
 
     
 class Package:
@@ -163,6 +115,7 @@ class Package:
     def __init__(self, packageName):
         self.name=packageName
         self.routines=dict()
+        self.dependencies=set()
     def addToPackage(self,Routine):
         self.routines[Routine.getName()] = Routine
         Routine.setPackage(self)
@@ -171,9 +124,23 @@ class Package:
     def getRoutine(self, routineName):
         return self.routines[routineName]
     def hasRoutine(self, routineName):
-        return routineName is self.routines.keys
+        return routineName in self.routines.keys()
     def getName(self):
         return self.name
+    def generatePackageDependencies(self):
+        for routine in self.routines:
+            calledRoutines=self.routines[routine].getCalledRoutines()
+            for calledRoutine in calledRoutines:
+                package = calledRoutine.getPackage()
+                if package and package != self and package not in self.dependencies :
+                    self.dependencies.add(package)
+    def getPackageDependencies(self):
+        return self.dependencies
+    
+    def printResult(self):
+        write("Package :%s, total Num of Routines: %d\n" % (self.name,len(self.routines)))
+        for package in self.dependencies:
+            write("depends on %s\n" % package.getName())
 
 class AbstractSectionParse:       
     def parseLine(self, line, logParse):
@@ -187,7 +154,7 @@ class LocalVarSectionParse (AbstractSectionParse):
     def parseLine(self, line, logParse):
         result = nameValuePair.search(line)
         if (result):
-                self.routine.addLocalVariables(result.group('name'))
+            self.routine.addLocalVariables(result.group('name'))
     def setRoutine(self, routine):
         self.routine=routine
 
@@ -197,7 +164,7 @@ class GlobalVarSectionParse (AbstractSectionParse):
     def parseLine(self, line, logParser):
         result = nameValuePair.search(line)
         if (result):
-                self.routine.addGlobalVariables(result.group('name'))
+            self.routine.addGlobalVariables(result.group('name'))
     def setRoutine(self, routine):
         self.routine=routine
 
@@ -207,7 +174,7 @@ class NakedGlobalsSectionParser (AbstractSectionParse):
     def parseLine(self, line, logParser):
         result = nameValuePair.search(line)
         if (result):
-                self.routine.addNakedGlobals(result.group('name'))
+            self.routine.addNakedGlobals(result.group('name'))
     def setRoutine(self, routine):
         self.routine=routine    
 
@@ -217,7 +184,7 @@ class MarkedItemsSectionParser (AbstractSectionParse):
     def parseLine(self, line, logParser):
         result = nameValuePair.search(line)
         if (result):
-                self.routine.addMarkedItems(result.group('name'))
+            self.routine.addMarkedItems(result.group('name'))
     def setRoutine(self, routine):
         self.routine=routine
                         
@@ -253,13 +220,21 @@ calledRoutineParser=CalledRoutineSectionParser()
 class RoutineVisit:
     def visitRoutine(self, routine, outputDir=None):
         pass
+    
+class PackageVisit:
+    def visitPackage(self, package, outputDir=None):
+        pass
 #===============================================================================
 # Default implementation of the routine 
 #===============================================================================    
-class DefaultRoutineVisit:
+class DefaultRoutineVisit(RoutineVisit):
     def visitRoutine(self, routine,outputDir=None):
         routine.printResult()
 
+class DefaultPackageVisit(PackageVisit):
+    def visitPackage(self, package, outputDir=None):
+        package.printResult()
+        
 class CallerGraphLogFileParser:
     def __init__(self):
         self.allRoutines = dict()
@@ -358,7 +333,8 @@ class CallerGraphLogFileParser:
         #            print "Name: %s Value=%s" % (result.group("name"), result.group("value"))
                     self.parseNameValuePair(line)
                     continue
-                
+        for package in self.allPackages.values():
+            package.generatePackageDependencies()      
     #===========================================================================
     # find all the package name and routines by reading the repository directory
     #===========================================================================

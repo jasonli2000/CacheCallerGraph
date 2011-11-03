@@ -33,16 +33,14 @@ class GraphvizRoutineVisit(CallerGraphParser.RoutineVisit):
     def visitRoutine(self, routine, outputDir):
         calledRoutines=routine.getCalledRoutines()
         if not calledRoutines or len(calledRoutines) == 0:
+            print("No called Routines found! for package:%s") % (routineName)
             return
         routineName=routine.getName()
         if not routine.getPackage():
-            print "ERROR: routine: %s does not belongs to a package" % routineName
+            print "ERROR: package: %s does not belongs to a package" % routineName
             return
         
         packageName = routine.getPackage().getName()
-        if len(calledRoutines) == 0:
-            print("No called Routines found! for routine:%s") % (routineName)
-            return
         localPackage=dict()
         localPackage[packageName]=set()
         localPackage[packageName].add(routineName)
@@ -76,7 +74,7 @@ class GraphvizRoutineVisit(CallerGraphParser.RoutineVisit):
                         output.write("\t\t%s->%s;\n" % (routineName, val))
             else:
                     output.write("\t\t%s [URL=\"%s\"];\n" % (getRoutineHtmlFileName(val), val))
-            output.write("\t\tlabel=\"%s\";\n" % var)
+            output.write("\t\tlabel=\"Package\\n%s\";\n" % var)
             output.write("\t}\n")
             if var != packageName:
                 for val in localPackage[var]:
@@ -94,6 +92,99 @@ class GraphvizRoutineVisit(CallerGraphParser.RoutineVisit):
         retCode=subprocess.call(command)
         if retCode != 0:
             print "Error: calling dot with command[%s] returns %d" % (command,retCode)
+
+class GraphvizPackageVisit(CallerGraphParser.PackageVisit):
+    def visitPackage(self, package, outputDir):
+        packageDependencies=package.getPackageDependencies()
+        packageName=package.getName()
+        normalizedName = normalizePackageName(packageName)
+        if not packageDependencies or len(packageDependencies) == 0:
+            print("No dependent Packages found! for package:%s") % (packageName)
+            return                
+        try:
+            dirName=os.path.join(outputDir,packageName)
+            if not os.path.exists(dirName):
+                os.makedirs(dirName)
+        except OSError:
+            print "Error making dir %s : Error: %s"  % (dirName, OSError)
+            return
+        
+        output=open(os.path.join(dirName,normalizedName+".dot"),'w')
+        output.write("digraph %s {\n" % normalizedName)
+        output.write("\tnode [shape=box];\n") # set the node shape to be box
+        output.write("\tedge [labelfloat=true fontsize=12];\n") # set the edge label and size props
+        output.write("\t%s [style=filled fillcolor=orange label=\"Package\\n%s\"];\n" % (normalizedName, packageName))
+        for package in packageDependencies:
+            output.write("\t%s [label=\"Package\\n%s\" URL=\"%s\"];\n" % (normalizePackageName(package.getName()), package.getName(), getPackageHtmlFileName(package.getName())))
+            output.write("\t%s->%s [label=\"depends\"];\n" % (normalizedName, normalizePackageName(package.getName())))
+        output.write("}\n")
+        output.close()
+        
+        # use dot tools to generated the image and client side mapping
+        outputName = os.path.join(dirName,normalizedName+".gif")
+        outputmap=os.path.join(dirName, normalizedName+".cmapx")
+        inputName=os.path.join(dirName,normalizedName+".dot")
+        # this is to generated the image in gif format and also cmapx (client side map) to make sure link
+        # embeded in the graph is clickable
+        command="dot -Tgif -o\"%s\" -Tcmapx -o\"%s\" \"%s\"" % (outputName, outputmap, inputName)
+#        print command
+        retCode=subprocess.call(command)
+        if retCode != 0:
+            print "Error: calling dot with command[%s] returns %d" % (command,retCode)
+            
+class CplusRoutineVisit(CallerGraphParser.RoutineVisit):
+    def visitRoutine(self, routine, outputDir):
+        calledRoutines=routine.getCalledRoutines()
+        if not calledRoutines or len(calledRoutines) == 0:
+            print("No called Routines found! for package:%s") % (routineName)
+            return
+        routineName=routine.getName()
+        if not routine.getPackage():
+            print "ERROR: package: %s does not belongs to a package" % routineName
+            return
+        
+        packageName = routine.getPackage().getName()
+        try:
+            dirName=os.path.join(outputDir, packageName)
+            if not os.path.exists(dirName):
+                os.makedirs(dirName)
+        except OSError:
+            print "Error making dir %s : Error: %s"  % (dirName, OSError)
+            return
+        
+        outputFile = open(os.path.join(dirName,routineName), 'w')
+        outputFile.write(("/*! \\namespace %s \n") % (packageName))
+        outputFile.write("*/\n")
+        outputFile.write("namespace %s {" % packageName)
+
+        outputFile.write("/* Global Vars: */\n")            
+        for var in routine.getGlobalVariables():
+            outputFile.write( " int %s;\n" % var)
+        outputFile.write("\n")   
+        outputFile.write("/* Naked Globals: */\n")
+        for var in routine.getNakeGlobals:
+            outputFile.write( " int %s;\n" % var)
+        outputFile.write("\n")
+        outputFile.write("/* Marked Items: */\n")
+        for var in routine.getMarkedItems():
+            outputFile.write( " int %s;\n" % var)
+        outputFile.write("\n")     
+        outputFile.write("/*! \callgraph\n")
+        outputFile.write("*/\n")
+        outputFile.write ("void " + self.name+ "(){\n")
+        
+        outputFile.write("/* Local Vars: */\n")
+        for var in routine.getLocalVariables():
+            outputFile.write(" int %s; \n" % var)
+
+
+        outputFile.write("/* Called Routines: */\n")
+        for var in calledRoutines:
+            outputFile.write( "  %s ();\n" % var)
+        outputFile.write("}\n")        
+        outputFile.write("}// end of namespace")
+        outputFile.close()    
+        
 # utility functions
 def getRoutineHtmlFileName(routineName):
     return "Routine_%s.html" % routineName
@@ -104,11 +195,13 @@ def getPackageHtmlFileName(packageName):
 def getRoutineHypeLinkByName(routineName):
     return "<a href=\"%s\">%s</a>" % (getRoutineHtmlFileName(routineName), routineName);
 
-def getPackageHypefLinkByName(packageName):
+def getPackageHyperLinkByName(packageName):
     return "<a href=\"%s\">%s</a>" % (getPackageHtmlFileName(packageName), packageName);
 
 def normalizePackageName(packageName):
-    return packageName.replace(' ','_')
+    newName = packageName.replace(' ','_')
+    return newName.replace('-',"_")
+    
 
 # generate index bar based on input list
 def generateIndexBar(outputFile, inputList):
@@ -142,23 +235,43 @@ def generateIndexedRoutineTableRow(outputFile, inputList):
             outputFile.write("<td><a class=\"el\" href=\"%s\">%s</a>&nbsp;&nbsp;&nbsp;</td>" % (getRoutineHtmlFileName(item), item))
     outputFile.write("</tr>\n")
 
+# class to generate the web page based on input
 class WebPageGenerator:
     def __init__(self, allPackages, allRoutines, outDir):
         self.allPackages=allPackages
         self.allRoutines=allRoutines
         self.outDir=outDir
+        self.header=[]
+        self.footer=[]
+        #load header and footer
+        header = open(os.path.join(self.outDir,"header.html"),'r')
+        footer = open(os.path.join(self.outDir,"footer.html"),'r')
+        for line in header:
+            self.header.append(line)
+        for line in footer:
+            self.footer.append(line)
+        header.close()
+        footer.close()
+        
+    def includeHeader(self, outputFile):
+        for line in self.header:
+            outputFile.write(line)
+            
+    def includeFooter(self, outputFile):
+        for line in self.footer:
+            outputFile.write(line)
+                        
     def generateWebPage(self):
+        self.generatePackageDependencies()
         self.generateRoutineIndexPage()
         self.generateCallerGraph(self.outDir)
         self.generatePackagePage()
         self.generateIndividualPackagePage()
         self.generateIndividualRoutinePage()
-    # index all routines
+        
     def generateRoutineIndexPage(self):
-        header = open(os.path.join(self.outDir,"header.html"),'r')
         outputFile = open(os.path.join(self.outDir,"routines.html"),'w')  
-        for line in header:
-            outputFile.write(line)
+        self.includeHeader(outputFile)
         outputFile.write("<div class=\"header\">\n")
         outputFile.write("<div class=\"headertitle\">")
         outputFile.write("<h1>Routine Index List</h1>\n</div>\n</div>")
@@ -179,16 +292,33 @@ class WebPageGenerator:
             generateIndexedRoutineTableRow(outputFile,itemsPerRow)        
         outputFile.write("</table>\n</div>\n")
         generateIndexBar(outputFile, string.uppercase)
-        outputFile.write("</body>\n</html>\n")
+        self.includeFooter(outputFile)
         outputFile.close()
         
-    def generateCallerGraph(self, outDir):  
-        pass
+    def generateCallerGraph(self):  
+        # generate all dot file and use dot to generated the image file format
+        dotRoutineVisitor = GraphvizRoutineVisit()
+        print "Start generating caller graph......"
+        print "Time is: %s" % datetime.now()    
+        for var in self.allRoutines.values():
+            dotRoutineVisitor.visitRoutine(var,self.outDir)
+        print "Time is: %s" % datetime.now()
+        print "End of generating caller graph......"
+
+    def generatePackageDependencies(self):  
+        # generate all dot file and use dot to generated the image file format
+        dotPackageVisitor = GraphvizPackageVisit()
+        print "Start generating package dependencies......"
+        print "Time is: %s" % datetime.now()
+        print "Total Packages: %d" % len(self.allPackages.values())  
+        for package in self.allPackages.values():
+            dotPackageVisitor.visitPackage(package,self.outDir)
+        print "Time is: %s" % datetime.now()
+        print "End of generating package dependencies......"
+
     def generatePackagePage(self):
-        header = open(os.path.join(self.outDir,"header.html"),'r')
         outputFile = open(os.path.join(self.outDir,"packages.html"),'w')
-        for line in header:
-            outputFile.write(line)
+        self.includeHeader(outputFile)
         #write the header
         outputFile.write("<div class=\"header\">\n")
         outputFile.write("<div class=\"headertitle\">")
@@ -213,24 +343,35 @@ class WebPageGenerator:
             generateIndexedPackageTableRow(outputFile,itemsPerRow)
         outputFile.write("</table>\n</div>\n")
         generateIndexBar(outputFile, string.uppercase)
-        outputFile.write("</body>\n</html>\n")
+        self.includeFooter(outputFile)
         outputFile.close()
-        header.close()
     #generate the individual package pages
     def generateIndividualPackagePage(self):
-        header = open(os.path.join(self.outDir,"header.html"),'r')
-        headerLines=[]
-        for line in header:
-            headerLines.append(line)
-        header.close()
+        indexList=["Dependency Graph", "Package Dependencies List", "All Routines"]
         for package in sorted(self.allPackages.keys()):
             outputFile = open(os.path.join(self.outDir,getPackageHtmlFileName(package)),'w')
             #write the header part
-            for line in headerLines:
-                outputFile.write(line)
+            self.includeHeader(outputFile)
+            generateIndexBar(outputFile, indexList)
             outputFile.write("<div class=\"header\">\n")
             outputFile.write("<div class=\"headertitle\">")
             outputFile.write("<h1>Package %s</h1>\n</div>\n</div>" % package)
+            outputFile.write("<a name=\"Dependency Graph\"/><h2 align=\"left\">Dependency Graph</h2>")
+            # write the image of the dependency graph
+            try:
+                cmapFile = open(os.path.join(self.outDir,package+"/"+normalizePackageName(package)+".cmapx"),'r')
+                outputFile.write("<div class=\"contents\">\n")
+                outputFile.write("<img src=\"%s\" border=\"0\" alt=\"Call Graph\" usemap=\"#%s\"/>\n" 
+                           % (package+"/"+normalizePackageName(package)+".gif", normalizePackageName(package)))
+                #append the content of map outputFile
+                for line in cmapFile:
+                    outputFile.write(line)  
+                outputFile.write("</div>\n")
+            except (IOError):
+                pass         
+            # write the list of the package dependency list   
+            outputFile.write("<a name=\"Package Dependencies List\"/><h2 align=\"left\">Package Dependencies List</h2>")
+            
             outputFile.write("<a name=\"All Routines\"/><h2 align=\"left\">All Routines</h2>")
             outputFile.write("<div class=\"contents\"><table>\n")
             sortedRoutines=sorted(self.allPackages[package].getAllRoutines().keys())
@@ -246,39 +387,36 @@ class WebPageGenerator:
                                        % (getRoutineHtmlFileName(sortedRoutines[index+i*numPerCol]), sortedRoutines[index+i*numPerCol] ))
                     outputFile.write("</tr>\n")
             outputFile.write("</table>\n</div>\n")
-            outputFile.write("</body>\n</html>\n")
+            generateIndexBar(outputFile, indexList)
+            self.includeFooter(outputFile)
             outputFile.close()
 
     def generateIndividualRoutinePage(self):
-        header = open(os.path.join(self.outDir,"header.html"),'r')
-        headerLines=[]
-        for line in header:
-            headerLines.append(line)
-        header.close()  
+        print "Start generating individual Routines......"
+        print "Time is: %s" % datetime.now()    
         indexList=["Call Graph", "Called Routines", "Local Variables", "Global Variables", "Naked Globals", "Marked Items"]       
         for package in sorted(self.allPackages.keys()):
             for routineName in sorted(self.allPackages[package].getAllRoutines().keys()):
                 routine = self.allPackages[package].getAllRoutines()[routineName]
                 outputFile = open(os.path.join(self.outDir,getRoutineHtmlFileName(routineName)),'w')
                 # write the same header file
-                for line in headerLines:
-                    outputFile.write(line)
+                self.includeHeader(outputFile)
                 # generated the qindex bar
                 generateIndexBar(outputFile, indexList)
                 outputFile.write("<div class=\"header\">\n")
                 outputFile.write("<div class=\"headertitle\">")
-                outputFile.write("<h4>Package %s</h4>\n</div>\n</div>" % getPackageHypefLinkByName(package))
+                outputFile.write("<h4>Package %s</h4>\n</div>\n</div>" % getPackageHyperLinkByName(package))
                 outputFile.write("<h1>Routine %s</h1>\n</div>\n</div>" % routineName)
                 outputFile.write("<a name=\"Call Graph\"/><h2 align=\"left\">Call Graph</h2>")
                 calledRoutines = routine.getCalledRoutines()
                 if (calledRoutines and len(calledRoutines) > 0):
                     # write the image of the caller graph
                     try:
+                        cmapFile = open(os.path.join(self.outDir,package+"/"+routineName+".cmapx"),'r')
                         outputFile.write("<div class=\"contents\">\n")
                         outputFile.write("<img src=\"%s\" border=\"0\" alt=\"Call Graph\" usemap=\"#%s\"/>\n" 
                                    % (package+"/"+routineName+".gif", routineName))
                         #append the content of map outputFile
-                        cmapFile = open(os.path.join(self.outDir,package+"/"+routineName+".cmapx"),'r')
                         for line in cmapFile:
                             outputFile.write(line)  
                         outputFile.write("</div>\n")
@@ -291,7 +429,7 @@ class WebPageGenerator:
                         routinePackageLink=""
                         calledRoutineNameLink=calledRoutine.getName()
                         if (calledRoutine.getPackage()):
-                            routinePackageLink = getPackageHypefLinkByName(calledRoutine.getPackage().getName())
+                            routinePackageLink = getPackageHyperLinkByName(calledRoutine.getPackage().getName())
                             calledRoutineNameLink = getRoutineHypeLinkByName(calledRoutineNameLink)
                         outputFile.write("<tr><td class=\"indexkey\">%s</td><td class=\"indexvalue\">%s</td></tr>\n" 
                                    % (calledRoutineNameLink, routinePackageLink))
@@ -324,8 +462,10 @@ class WebPageGenerator:
                 
                 # generated the index bar at the bottom
                 generateIndexBar(outputFile, indexList)
-                outputFile.write("</body>\n</html>\n")
+                self.includeFooter(outputFile)
                 outputFile.close()
+        print "Time is: %s" % datetime.now()
+        print "End of generating individual routines......"    
 
 def testGenerateIndexBar(inputList):
     outputFile=open("C:/Temp/VistA/Test.html", 'w')
@@ -348,12 +488,12 @@ def testDotCall():
       
 if __name__ == '__main__':
     logParser = CallerGraphParser.CallerGraphLogFileParser()
-    print "Starting parsing package/routine relationship...."
+    print "Starting parsing package/package relationship...."
     print "Time is: %s" % datetime.now()
     routineFilePattern = "*/Routines/*.m"
     routineFileDir = "C:/cygwin/home/jason.li/git/VistA-FOIA/Packages/"
     logParser.findPackagesAndRoutinesBySource(routineFileDir, routineFilePattern)
-    print "End parsing package/routine relationship...."
+    print "End parsing package/package relationship...."
     print "Time is: %s" % datetime.now()
     
     print "Starting parsing caller graph log file...."    
@@ -362,17 +502,10 @@ if __name__ == '__main__':
     logParser.parseAllCallerGraphLog(callLogDir, callLogPattern)
     print "End of parsing log file......"
     print "Time is: %s" % datetime.now()         
-    # generate all dot file and use dot to generated the image file format
-    dotRoutineVisitor = GraphvizRoutineVisit()
-    
-#    print "Start generating caller graph......"
-#    print "Time is: %s" % datetime.now()    
-#    for var in logParser.getAllRoutines().values():
-#        dotRoutineVisitor.visitRoutine(var, "C:/Temp/VistA")
-#    print "Time is: %s" % datetime.now()
-#    print "End of generating caller graph......"
-    
+       
     print "Starting generating web pages...."
+    print "Time is: %s" % datetime.now()
     webPageGen=WebPageGenerator(logParser.getAllPackages(), logParser.getAllRoutines(),"C:/Temp/VistA")
     webPageGen.generateWebPage()
+    print "Time is: %s" % datetime.now()
     print "End of generating web pages...."
