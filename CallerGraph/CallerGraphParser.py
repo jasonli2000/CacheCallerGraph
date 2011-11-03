@@ -115,7 +115,7 @@ class Package:
     def __init__(self, packageName):
         self.name=packageName
         self.routines=dict()
-        self.dependencies=set()
+        self.dependencies=[]
     def addToPackage(self,Routine):
         self.routines[Routine.getName()] = Routine
         Routine.setPackage(self)
@@ -133,7 +133,7 @@ class Package:
             for calledRoutine in calledRoutines:
                 package = calledRoutine.getPackage()
                 if package and package != self and package not in self.dependencies :
-                    self.dependencies.add(package)
+                    self.dependencies.append(package)
     def getPackageDependencies(self):
         return self.dependencies
     

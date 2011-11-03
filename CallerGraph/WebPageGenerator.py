@@ -31,16 +31,15 @@ from datetime import datetime, date, time
 #===============================================================================
 class GraphvizRoutineVisit(CallerGraphParser.RoutineVisit):
     def visitRoutine(self, routine, outputDir):
-        calledRoutines=routine.getCalledRoutines()
-        if not calledRoutines or len(calledRoutines) == 0:
-            print("No called Routines found! for package:%s") % (routineName)
+        if not routine.getPackage():
+            print "ERROR: Routine: %s does not belongs to a package" % routineName
             return
         routineName=routine.getName()
-        if not routine.getPackage():
-            print "ERROR: package: %s does not belongs to a package" % routineName
-            return
-        
         packageName = routine.getPackage().getName()
+        calledRoutines=routine.getCalledRoutines()
+        if not calledRoutines or len(calledRoutines) == 0:
+            print("No called Routines found! for routine:%s package:%s") % (routineName, packageName)
+            return
         localPackage=dict()
         localPackage[packageName]=set()
         localPackage[packageName].add(routineName)
@@ -70,10 +69,11 @@ class GraphvizRoutineVisit(CallerGraphParser.RoutineVisit):
                 output.write("\t\t%s [style=filled fillcolor=orange];\n" % routineName)
                 for val in localPackage[var]:
                     if val != routineName:
-                        output.write("\t\t%s [URL=\"%s\"];\n" % (getRoutineHtmlFileName(val), val))
+                        output.write("\t\t%s [URL=\"%s\"];\n" % (val, getRoutineHtmlFileName(val)))
                         output.write("\t\t%s->%s;\n" % (routineName, val))
             else:
-                    output.write("\t\t%s [URL=\"%s\"];\n" % (getRoutineHtmlFileName(val), val))
+                for val in localPackage[var]:
+                    output.write("\t\t%s [URL=\"%s\"];\n" % (val, getRoutineHtmlFileName(val)))
             output.write("\t\tlabel=\"Package\\n%s\";\n" % var)
             output.write("\t}\n")
             if var != packageName:
@@ -116,7 +116,8 @@ class GraphvizPackageVisit(CallerGraphParser.PackageVisit):
         output.write("\t%s [style=filled fillcolor=orange label=\"Package\\n%s\"];\n" % (normalizedName, packageName))
         for package in packageDependencies:
             output.write("\t%s [label=\"Package\\n%s\" URL=\"%s\"];\n" % (normalizePackageName(package.getName()), package.getName(), getPackageHtmlFileName(package.getName())))
-            output.write("\t%s->%s [label=\"depends\"];\n" % (normalizedName, normalizePackageName(package.getName())))
+#            output.write("\t%s->%s [label=\"depends\"];\n" % (normalizedName, normalizePackageName(package.getName())))
+            output.write("\t%s->%s;\n" % (normalizedName, normalizePackageName(package.getName())))
         output.write("}\n")
         output.close()
         
@@ -263,11 +264,11 @@ class WebPageGenerator:
                         
     def generateWebPage(self):
         self.generatePackageDependencies()
-        self.generateRoutineIndexPage()
-        self.generateCallerGraph(self.outDir)
-        self.generatePackagePage()
+#        self.generateRoutineIndexPage()
+#        self.generateCallerGraph()
+#        self.generatePackagePage()
         self.generateIndividualPackagePage()
-        self.generateIndividualRoutinePage()
+#        self.generateIndividualRoutinePage()
         
     def generateRoutineIndexPage(self):
         outputFile = open(os.path.join(self.outDir,"routines.html"),'w')  
@@ -370,23 +371,36 @@ class WebPageGenerator:
             except (IOError):
                 pass         
             # write the list of the package dependency list   
-            outputFile.write("<a name=\"Package Dependencies List\"/><h2 align=\"left\">Package Dependencies List</h2>")
-            
-            outputFile.write("<a name=\"All Routines\"/><h2 align=\"left\">All Routines</h2>")
+            outputFile.write("<a name=\"Package Dependencies List\"/><h2 align=\"left\">Package Dependencies List</h2>\n")
+            dependencyPackage=self.allPackages[package].getPackageDependencies()
+            if dependencyPackage and len(dependencyPackage) > 0:
+                outputFile.write("<div class=\"contents\"><table>\n")
+                totalPackages=len(dependencyPackage)
+                numOfCol=6
+                numOfRow=totalPackages/numOfCol+1
+                for index in range(numOfRow):
+                    outputFile.write("<tr>")
+                    for j in range(numOfCol):
+                        if (index*numOfCol + j) < totalPackages:
+                            outputFile.write("<td class=\"indexkey\"><a class=\"e1\" href=\"%s\">%s</a>&nbsp;&nbsp;&nbsp</td>" 
+                                       % (getPackageHtmlFileName(dependencyPackage[index*numOfCol + j].getName()), dependencyPackage[index*numOfCol + j].getName() ))
+                    outputFile.write("</tr>\n")
+                outputFile.write("</table></div>\n")
+            outputFile.write("<a name=\"All Routines\"/><h2 align=\"left\">All Routines</h2>\n")
             outputFile.write("<div class=\"contents\"><table>\n")
             sortedRoutines=sorted(self.allPackages[package].getAllRoutines().keys())
             totalNumRoutine = len(sortedRoutines)
             totalCol=8
-            numPerCol = totalNumRoutine/totalCol+1
+            numOfRow = totalNumRoutine/totalCol+1
             if totalNumRoutine > 0:
-                for index in range(numPerCol):
+                for index in range(numOfRow):
                     outputFile.write("<tr>")
                     for i in range(totalCol):
-                        if (index+i*numPerCol) < totalNumRoutine:
+                        if (index*totalCol+i) < totalNumRoutine:
                             outputFile.write("<td class=\"indexkey\"><a class=\"e1\" href=\"%s\">%s</a>&nbsp;&nbsp;&nbsp;&nbsp;</td>" 
-                                       % (getRoutineHtmlFileName(sortedRoutines[index+i*numPerCol]), sortedRoutines[index+i*numPerCol] ))
+                                       % (getRoutineHtmlFileName(sortedRoutines[index*totalCol+i]), sortedRoutines[index*totalCol+i] ))
                     outputFile.write("</tr>\n")
-            outputFile.write("</table>\n</div>\n")
+            outputFile.write("</table>\n</div>\n<br/>")
             generateIndexBar(outputFile, indexList)
             self.includeFooter(outputFile)
             outputFile.close()
