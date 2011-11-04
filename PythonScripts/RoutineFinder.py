@@ -45,14 +45,20 @@ if __name__ == '__main__':
     
     callLogPattern="*.log"
     logParser.parseAllCallerGraphLog(result['logFileDir'], callLogPattern)
+    orphanRoutines=sorted(logParser.getOrphanRoutines())
     print "End of parsing log file......"
     print "Time is: %s" % datetime.now()
     # read the user input from the terminal
     isExit=False
+    print "Please enter quit to exit"
+    print "please enter orphan_routine to print orphan routines"
     while not isExit:
         var = raw_input("Please enter the routine Name:")
         if (var == 'quit'):
             isExit=True
             continue
+        if (var=='orphan_routine'):
+            for routine in orphanRoutines:
+                print routine
         else:
             logParser.printRoutine(var)

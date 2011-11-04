@@ -41,6 +41,7 @@ RoutineEnd=re.compile("-+ END -+")
 
 write=sys.stdout.write
 
+# A class to wrap up information about a VistA Routine
 class Routine:
     #constructor
     def __init__(self, routineName, package=None):
@@ -106,9 +107,7 @@ class Routine:
             else:
                 write("\n")
                 
-
-
-    
+# class package to represent a VistA package    
 class Package:
     #constructor
     def __init__(self, packageName):
@@ -141,12 +140,18 @@ class Package:
         for package in self.dependencies:
             write("depends on %s\n" % package.getName())
 
+#===============================================================================
+# Interface to parse a section of the XINDEX log file
+#===============================================================================  
 class AbstractSectionParse:       
     def parseLine(self, line, logParse):
         pass
     def setRoutine(self, routine):
         pass
 
+#===============================================================================
+# Implementation of a section parser to parse the local variables part
+#===============================================================================  
 class LocalVarSectionParse (AbstractSectionParse):
     def __init__(self):
         self.routine=None
@@ -157,6 +162,9 @@ class LocalVarSectionParse (AbstractSectionParse):
     def setRoutine(self, routine):
         self.routine=routine
 
+#===============================================================================
+# Implementation of a section parser to parse the Global variables part
+#===============================================================================  
 class GlobalVarSectionParse (AbstractSectionParse):
     def __init__(self):
         self.routine=None
@@ -167,6 +175,9 @@ class GlobalVarSectionParse (AbstractSectionParse):
     def setRoutine(self, routine):
         self.routine=routine
 
+#===============================================================================
+# Implementation of a section parser to parse the Naked Globals part
+#===============================================================================  
 class NakedGlobalsSectionParser (AbstractSectionParse):
     def __init__(self):
         self.routine=None
@@ -177,6 +188,9 @@ class NakedGlobalsSectionParser (AbstractSectionParse):
     def setRoutine(self, routine):
         self.routine=routine    
 
+#===============================================================================
+# Implementation of a section parser to parse the Marked Items part
+#=============================================================================== 
 class MarkedItemsSectionParser (AbstractSectionParse):
     def __init__(self):
         self.routine=None
@@ -186,7 +200,10 @@ class MarkedItemsSectionParser (AbstractSectionParse):
             self.routine.addMarkedItems(result.group('name'))
     def setRoutine(self, routine):
         self.routine=routine
-                        
+
+#===============================================================================
+# Implementation of a section parser to parse the Called Routine parts
+#===============================================================================                         
 class CalledRoutineSectionParser (AbstractSectionParse):
     def __init__(self):
         self.routine=None
@@ -202,17 +219,20 @@ class CalledRoutineSectionParser (AbstractSectionParse):
                 routine=logParser.getAllRoutines()[routineName]
                 self.routine.addCalledRoutines(routine)
             else:
-                print ("Routine: [%s] called Routine: %s is Not in any package" 
-                      % (self.routine.getName(), routineName))
+                logParser.getOrphanRoutines().add(routineName)
                 self.routine.addCalledRoutines(Routine(routineName))
     def setRoutine(self, routine):
         self.routine=routine    
-# global one 
+
+#===============================================================================
+# Global instance of section parser
+#=============================================================================== 
 localVarParser=LocalVarSectionParse()
 globalVarParser=GlobalVarSectionParse()
 nakedGlobalParser=NakedGlobalsSectionParser()
 markedItemsParser=MarkedItemsSectionParser()
 calledRoutineParser=CalledRoutineSectionParser()
+
 #===============================================================================
 # interface to generated the output based on a routine
 #===============================================================================
@@ -224,23 +244,29 @@ class PackageVisit:
     def visitPackage(self, package, outputDir=None):
         pass
 #===============================================================================
-# Default implementation of the routine 
+# Default implementation of the routine Visit
 #===============================================================================    
 class DefaultRoutineVisit(RoutineVisit):
     def visitRoutine(self, routine,outputDir=None):
         routine.printResult()
-
+#===============================================================================
+# Default implementation of the package Visit
+#===============================================================================   
 class DefaultPackageVisit(PackageVisit):
     def visitPackage(self, package, outputDir=None):
         package.printResult()
-        
+
+#===============================================================================
+# A class to parse XINDEX log file output and convert to Routine/Package
+#===============================================================================          
 class CallerGraphLogFileParser:
     def __init__(self):
         self.allRoutines = dict()
         self.allPackages = dict()
+        self.orphanRoutines=set() # routines that does not belong to any package, mostly mumps functions
         self.currentRoutine=None
         self.parser=None
-        
+    
     def onNewRoutineStart(self, routineName):
         if routineName not in self.allRoutines.keys():
             print "Invalid Routine: %s" % routineName
@@ -281,11 +307,15 @@ class CallerGraphLogFileParser:
             visitor.visitRoutine(routine)
         else:
             print "Routine: %s Not Found!" % routineName
+            
     def getAllRoutines(self):
         return self.allRoutines
     
     def getAllPackages(self):
         return self.allPackages
+    
+    def getOrphanRoutines(self):
+        return self.orphanRoutines
     
     #===========================================================================
     # pass the log file and get all routines ready
@@ -332,6 +362,8 @@ class CallerGraphLogFileParser:
         #            print "Name: %s Value=%s" % (result.group("name"), result.group("value"))
                     self.parseNameValuePair(line)
                     continue
+                
+        # generate package direct dependency based on XINDEX call graph
         for package in self.allPackages.values():
             package.generatePackageDependencies()      
     #===========================================================================
@@ -361,9 +393,4 @@ class CallerGraphLogFileParser:
     
 
 if __name__ == '__main__':
-    # the step to parse the log file
-    #parse the log file
-#    testDotCall()
-#    exit()
     pass
-
