@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# A parser to parse XINDEX log file and generate the routine documentation
+# A parser to parse XINDEX log file and generate the routine/package information
 #---------------------------------------------------------------------------
 # Copyright 2011 The Open Source Electronic Health Record Agent
 #
@@ -38,9 +38,6 @@ markedItemStart=re.compile("^Marked Items")
 routineInvokesStart=re.compile('Routine +Invokes')
 calledRoutineStart=re.compile("^Routine +is Invoked by:")
 RoutineEnd=re.compile("-+ END -+")
-PressRe
-LinesToIgnore=[]
-
 
 write=sys.stdout.write
 
