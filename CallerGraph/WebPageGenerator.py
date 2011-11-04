@@ -244,15 +244,20 @@ class WebPageGenerator:
         self.outDir=outDir
         self.header=[]
         self.footer=[]
-        #load header and footer
+        self.source_header=[]
+        #load header and footer 
         header = open(os.path.join(self.outDir,"header.html"),'r')
         footer = open(os.path.join(self.outDir,"footer.html"),'r')
+        source_header = open(os.path.join(self.outDir,"source_header.html"),'r')
         for line in header:
             self.header.append(line)
         for line in footer:
             self.footer.append(line)
+        for line in source_header:
+            self.source_header.append(line)
         header.close()
         footer.close()
+        source_header.close()
         
     def includeHeader(self, outputFile):
         for line in self.header:
@@ -261,15 +266,41 @@ class WebPageGenerator:
     def includeFooter(self, outputFile):
         for line in self.footer:
             outputFile.write(line)
-                        
+    
+    def inlcudeSourceHeader(self, outputFile):   
+        for line in self.source_header:
+            outputFile.write(line)
+                             
     def generateWebPage(self):
         self.generatePackageDependencies()
-#        self.generateRoutineIndexPage()
-#        self.generateCallerGraph()
-#        self.generatePackagePage()
+        self.generateRoutineIndexPage()
+        self.generateCallerGraph()
+        self.generatePackagePage()
         self.generateIndividualPackagePage()
-#        self.generateIndividualRoutinePage()
+        self.generateIndividualRoutinePage()
         
+    # inputDir should be 
+    def generateSourceCodePage(self, inputDir):
+        for routineName in self.allRoutines.keys():
+            packageName = self.allRoutines[routineName].getPackage().getName()
+            sourcePath=os.path.join(inputDir, "Packages"+os.path.sep+packageName+os.path.sep+"Routines"+os.path.sep+routineName+".m")
+            if not os.path.exists(sourcePath):
+                print "Error:Souce file:[%s] does not exit\n" % sourcePath
+                continue
+            sourceFile=open(sourcePath,'r')
+            outputFile=open(os.path.join(self.outDir, "Routine_%s_source.html" % routineName),'w')
+            self.inlcudeSourceHeader(outputFile)
+            outputFile.write("<div><h1>%s.m</h1></div>\n" % routineName)
+            outputFile.write("<a href=\"%s\">Go to the documentation of this file.</a>" % getRoutineHtmlFileName(routineName))
+            outputFile.write("<pre class=\"prettyprint lang-mumps linenums:1\">\n")
+            for line in sourceFile:
+                outputFile.write(line)
+            outputFile.write("</pre>\n")
+            self.includeFooter(outputFile)
+            sourceFile.close()
+            outputFile.close()
+            
+    
     def generateRoutineIndexPage(self):
         outputFile = open(os.path.join(self.outDir,"routines.html"),'w')  
         self.includeHeader(outputFile)
@@ -408,7 +439,7 @@ class WebPageGenerator:
     def generateIndividualRoutinePage(self):
         print "Start generating individual Routines......"
         print "Time is: %s" % datetime.now()    
-        indexList=["Call Graph", "Called Routines", "Local Variables", "Global Variables", "Naked Globals", "Marked Items"]       
+        indexList=["Source Code", "Call Graph", "Called Routines", "Local Variables", "Global Variables", "Naked Globals", "Marked Items"]       
         for package in sorted(self.allPackages.keys()):
             for routineName in sorted(self.allPackages[package].getAllRoutines().keys()):
                 routine = self.allPackages[package].getAllRoutines()[routineName]
@@ -420,8 +451,10 @@ class WebPageGenerator:
                 outputFile.write("<div class=\"header\">\n")
                 outputFile.write("<div class=\"headertitle\">")
                 outputFile.write("<h4>Package %s</h4>\n</div>\n</div>" % getPackageHyperLinkByName(package))
-                outputFile.write("<h1>Routine %s</h1>\n</div>\n</div>" % routineName)
-                outputFile.write("<a name=\"Call Graph\"/><h2 align=\"left\">Call Graph</h2>")
+                outputFile.write("<h1>Routine %s</h1>\n</div>\n</div><br/>\n" % routineName)
+                outputFile.write("<a name=\"Source Code\"/><h2 align=\"left\">Source Code</h2>\n")
+                outputFile.write("<p><code>Source file &lt;<a class=\"el\" href=\"Routine_%s_source.html\">%s.m</a>&gt;</code></p>\n" % (routineName, routineName))
+                outputFile.write("<a name=\"Call Graph\"/><h2 align=\"left\">Call Graph</h2>\n")
                 calledRoutines = routine.getCalledRoutines()
                 if (calledRoutines and len(calledRoutines) > 0):
                     # write the image of the caller graph
@@ -520,6 +553,8 @@ if __name__ == '__main__':
     print "Starting generating web pages...."
     print "Time is: %s" % datetime.now()
     webPageGen=WebPageGenerator(logParser.getAllPackages(), logParser.getAllRoutines(),"C:/Temp/VistA")
+    sourceFileDir = "C:/cygwin/home/jason.li/git/VistA-FOIA/"
+    webPageGen.generateSourceCodePage(sourceFileDir)
     webPageGen.generateWebPage()
     print "Time is: %s" % datetime.now()
     print "End of generating web pages...."

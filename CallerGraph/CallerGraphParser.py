@@ -38,6 +38,8 @@ markedItemStart=re.compile("^Marked Items")
 routineInvokesStart=re.compile('Routine +Invokes')
 calledRoutineStart=re.compile("^Routine +is Invoked by:")
 RoutineEnd=re.compile("-+ END -+")
+PressRe
+LinesToIgnore=[]
 
 
 write=sys.stdout.write
@@ -250,7 +252,7 @@ class CallerGraphLogFileParser:
 
     def onNewRoutineEnd(self, routineName):
         self.currentRoutine = None
-        
+        self.parser=None
     def onLocalVariablesStart(self, line):
         self.parser=localVarParser
         self.parser.setRoutine(self.currentRoutine)
